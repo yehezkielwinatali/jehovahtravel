@@ -1,0 +1,171 @@
+@import "tailwindcss";
+
+@theme {
+  /* Mendaftarkan animasi custom agar bisa dipakai sebagai utility class */
+  /* Contoh penggunaan: class="animate-blob" atau class="animate-float-slow" */
+  @keyframes blob {
+    0% {
+      transform: translate(0px, 0px) scale(1);
+    }
+    33% {
+      transform: translate(30px, -50px) scale(1.1);
+    }
+    66% {
+      transform: translate(-20px, 20px) scale(0.9);
+    }
+    100% {
+      transform: translate(0px, 0px) scale(1);
+    }
+  }
+  @keyframes float-slow {
+    0%,
+    100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-20px) rotate(180deg);
+    }
+  }
+  @keyframes float-medium {
+    0%,
+    100% {
+      transform: translateY(0px) rotate(0deg);
+    }
+    50% {
+      transform: translateY(-15px) rotate(90deg);
+    }
+  }
+  @keyframes pulse-slow {
+    0%,
+    100% {
+      opacity: 0.2;
+      transform: scale(1);
+    }
+    50% {
+      opacity: 0.3;
+      transform: scale(1.05);
+    }
+  }
+
+  /* Mapping nama animasi ke keyframes */
+  --animate-blob: blob 7s infinite;
+  --animate-float-slow: float-slow 8s ease-in-out infinite;
+  --animate-float-medium: float-medium 6s ease-in-out infinite;
+  --animate-pulse-slow: pulse-slow 4s ease-in-out infinite;
+}
+
+/* Mengelompokkan utility custom ke dalam layer utility agar tidak konflik */
+@layer utilities {
+  .animation-delay-2000 {
+    animation-delay: 2s;
+  }
+  .animation-delay-4000 {
+    animation-delay: 4s;
+  }
+}
+
+/* Global Styles & Print Logic */
+@layer base {
+  .print-preview-container {
+    width: 100%;
+    max-width: 30cm;
+    margin: 0 auto;
+    padding: 1.5cm;
+    background-color: white;
+    box-sizing: border-box;
+    @apply shadow-md; /* Menggunakan utility v4 */
+  }
+
+  .print-preview-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 1.5cm;
+  }
+
+  .print-preview-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1cm 0;
+  }
+
+  .print-preview-table th {
+    background-color: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 12px 8px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 12px;
+  }
+
+  .print-preview-table td {
+    border: 1px solid #e2e8f0;
+    padding: 10px 8px;
+    font-size: 12px;
+  }
+
+  /* Sisipkan sisa style logo, signature, dsb di sini */
+}
+
+/* Responsivitas menggunakan standard CSS */
+@media screen and (max-width: 768px) {
+  .print-preview-container {
+    padding: 1rem !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+  }
+  .print-preview-header {
+    flex-direction: column !important;
+    gap: 1rem !important;
+  }
+}
+
+/* Print Logic: Sangat penting untuk fungsi cetak */
+@media print {
+  @page {
+    size: A4;
+    margin: 0; /* Margin nol agar kita kontrol lewat padding container */
+  }
+
+  html,
+  body {
+    height: 100%;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden; /* Mencegah scrollbar/sisa konten bikin halaman baru */
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  .print-preview-container,
+  .print-preview-container * {
+    visibility: visible;
+  }
+
+  .print-preview-container {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 210mm;
+    /* Pakai height auto atau sedikit kurang dari 297mm untuk margin aman */
+    height: 100%;
+    max-height: 297mm;
+    margin: 0 !important;
+    padding: 15mm !important;
+    box-shadow: none !important;
+    page-break-after: avoid; /* Mencegah pindah halaman */
+  }
+
+  /* Hilangkan sisa-sisa whitespace */
+  .no-print {
+    display: none !important;
+  }
+}
+@layer base {
+  html {
+    font-size: 12px;
+  }
+}

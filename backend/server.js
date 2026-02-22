@@ -1,0 +1,36 @@
+import express from "express";
+import cors from "cors";
+import "dotenv/config";
+import { clerkMiddleware } from "@clerk/express";
+import { connectDB } from "./config/db.js";
+import path from "path";
+import invoiceRouter from "./routes/invoiceRouter.js";
+
+const app = express();
+const port = 4000;
+
+//middleware
+app.use(
+  cors({
+    origin: "http://localhost:5173",
+    credentials: true,
+  }),
+);
+app.use(express.json({ limit: "20mb" }));
+app.use(clerkMiddleware());
+app.use(express.urlencoded({ limit: "20mb", extended: true }));
+
+//db
+connectDB();
+
+//routes
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/api/invoice", invoiceRouter);
+
+app.get("/", (req, res) => {
+  res.send("Hello World!");
+});
+
+app.listen(port, () => {
+  console.log(`App is running on http://localhost:${port}`);
+});
