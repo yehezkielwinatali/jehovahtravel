@@ -322,7 +322,7 @@ export async function deleteInvoice(req, res) {
 export const exportInvoicesToExcel = async (req, res) => {
   try {
     const { month, year } = req.query;
-    const owner = req.auth.userId;
+    const { userId: owner } = getAuth(req) || {};
 
     const m = String(month).padStart(2, "0");
     const startStr = `${year}-${m}-01`;
