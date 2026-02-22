@@ -6,7 +6,7 @@ import stamp from "../assets/stamp.png";
 import { invoicePreviewStyles } from "../assets/dummyStyles";
 
 // Konfigurasi API tetap sama
-const API_BASE = "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL;
 const PROFILE_ENDPOINT = `${API_BASE}/api/businessProfile/me`;
 const INVOICE_ENDPOINT = (id) => `${API_BASE}/api/invoice/${id}`;
 const EditIcon = ({ className = "w-4 h-4" }) => (

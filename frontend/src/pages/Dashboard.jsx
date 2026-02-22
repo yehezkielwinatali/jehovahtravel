@@ -4,7 +4,7 @@ import { useAuth } from "@clerk/clerk-react";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import KpiCard from "../components/KpiCard";
 import StatuBadge from "../components/StatusBadge";
-const API_BASE = "http://localhost:4000";
+const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL;
 
 function normalizeClient(raw) {
   if (!raw) return { name: "", email: "", address: "", phone: "" };

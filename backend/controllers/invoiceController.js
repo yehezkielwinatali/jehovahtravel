@@ -5,8 +5,6 @@ import path from "path";
 import { generateInvoiceNumber } from "../utils/generateInvoiceNumber.js";
 import ExcelJS from "exceljs";
 
-const API_BASE_URL = "http://localhost:4000";
-
 const isObjectIdString = (id) => mongoose.Types.ObjectId.isValid(id);
 
 function getTodayLocal() {
@@ -68,7 +66,8 @@ function uploadedFilesToUrls(req) {
       const filename =
         arr[0].filename || (arr[0].path && path.basename(arr[0].path));
       if (filename) {
-        urls[mapping[field]] = `${API_BASE_URL}/uploads/${filename}`;
+        urls[mapping[field]] =
+          `${process.env.API_BASE_URL}/uploads/${filename}`;
       }
     }
   });
