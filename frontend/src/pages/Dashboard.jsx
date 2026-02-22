@@ -219,13 +219,6 @@ const Dashboard = () => {
     try {
       const token = await obtainToken();
       if (!token) return null;
-      const res = await fetch(`${API_BASE}/api/businessProfile/me`, {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: "application/json",
-        },
-      });
       if (res.status === 401) {
         // silently ignore; profile not available
         return;
