@@ -152,9 +152,9 @@ export async function getInvoices(req, res) {
         { invoiceNumber: searchRegex },
         { "client.name": searchRegex },
         { fromEmail: searchRegex },
-        // ⬇️ INI KUNCINYA UNTUK MENCARI DI DALAM TABEL ⬇️
-        { "items.name": searchRegex }, // Mencari "BUDIANTO"
-        { "items.description": searchRegex }, // Mencari "SQ123"
+        { "items.name": searchRegex },
+        { "items.description": searchRegex },
+        { "items.supplier": searchRegex },
       ];
     }
 
@@ -342,8 +342,9 @@ export const exportInvoicesToExcel = async (req, res) => {
       { header: "Nama Client", key: "clientName", width: 25 },
       { header: "Nama Penumpang", key: "passengerName", width: 25 },
       { header: "Keterangan", key: "description", width: 30 },
+      { header: "Supplier", key: "supplier", width: 25 },
       { header: "Total", key: "total", width: 18 },
-      { header: "Total NTA (Modal)", key: "totalNta", width: 15 }, // Baru
+      { header: "Total NTA (Modal)", key: "totalNta", width: 15 },
       { header: "Profit", key: "profit", width: 15 },
       { header: "Status", key: "status", width: 15 },
     ];
@@ -365,14 +366,18 @@ export const exportInvoicesToExcel = async (req, res) => {
     invoices.forEach((inv) => {
       const passengerNames = inv.items.map((item) => item.name).join(", ");
       const descriptions = inv.items.map((item) => item.description).join(", ");
+      const suppliers = inv.items
+        .map((item) => item.supplier || "-")
+        .join(", ");
+
       const nilaiTotal = Number(inv.total || 0);
-      const nilaiNta = Number(inv.totalNta || 0); // AMBIL DARI DB
-      const nilaiProfit = Number(inv.profit || 0); // AMBIL DARI DB
+      const nilaiNta = Number(inv.totalNta || 0);
+      const nilaiProfit = Number(inv.profit || 0);
 
       totalOmzet += nilaiTotal;
       grandTotalNta += nilaiNta;
       grandTotalProfit += nilaiProfit;
-      // Logika Hitung Status & Nominal
+
       const statusLower = (inv.status || "").toLowerCase();
 
       if (statusLower === "paid") {
@@ -380,7 +385,6 @@ export const exportInvoicesToExcel = async (req, res) => {
         countPaid++;
       } else {
         omzetPiutang += nilaiTotal;
-        // Cek apakah overdue (jika bukan paid dan melewati dueDate)
         if (inv.dueDate && inv.dueDate < today) {
           countOverdue++;
         } else {
@@ -394,9 +398,10 @@ export const exportInvoicesToExcel = async (req, res) => {
         clientName: inv.client?.name || "-",
         passengerName: passengerNames || "-",
         description: descriptions || "-",
+        supplier: suppliers || "-",
         total: nilaiTotal,
-        totalNta: nilaiNta, // ISI NILAINYA
-        profit: nilaiProfit, // ISI NILAINYA
+        totalNta: nilaiNta,
+        profit: nilaiProfit,
         status: statusLower.toUpperCase(),
       });
     });

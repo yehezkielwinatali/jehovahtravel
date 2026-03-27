@@ -28,7 +28,11 @@ const itemSchema = new mongoose.Schema(
     nta: {
       type: Number,
       required: true,
-      default: 0, // Harga modal per item
+      default: 0,
+    },
+    supplier: {
+      type: String,
+      default: "",
     },
   },
   {

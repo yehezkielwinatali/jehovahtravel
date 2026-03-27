@@ -253,7 +253,17 @@ export default function CreateInvoice() {
       fromPhone: "",
       fromGst: "",
       client: { name: "", email: "", address: "", phone: "" },
-      items: [{ id: uid(), description: "", qty: 1, unitPrice: 0 }],
+      items: [
+        {
+          id: uid(),
+          name: "",
+          description: "",
+          qty: 1,
+          unitPrice: 0,
+          nta: 0,
+          supplier: "",
+        },
+      ],
       currency: "IDR",
       status: "draft",
       downPayment: 0,
@@ -288,11 +298,9 @@ export default function CreateInvoice() {
       const it = { ...(copy[idx] || {}) };
 
       // Jika kuncinya adalah 'description' atau 'name', simpan sebagai teks (string)
-      if (key === "description" || key === "name") {
+      if (key === "description" || key === "name" || key === "supplier") {
         it[key] = value;
-      }
-      // Selain itu (qty & unitPrice), ubah menjadi angka (number)
-      else {
+      } else {
         it[key] = Number(value) || 0;
       }
 
@@ -304,11 +312,12 @@ export default function CreateInvoice() {
   function addItem() {
     const it = {
       id: uid(),
-      name: "", // Tambahkan ini untuk Nama Penumpang
+      name: "",
       description: "",
       qty: 1,
       unitPrice: 0,
       nta: 0,
+      supplier: "",
     };
 
     setItems((arr) => {
@@ -333,6 +342,7 @@ export default function CreateInvoice() {
                 qty: 1,
                 unitPrice: 0,
                 nta: 0,
+                supplier: "",
               },
             ];
 
@@ -1051,36 +1061,63 @@ export default function CreateInvoice() {
                     </div>
                     {/* NTA */}
 
+                    {/* NTA + Supplier (sebelahan) */}
                     <div className="col-span-3">
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        htmlFor={`price-${idx}`}
-                      >
-                        NTA
-                      </label>
-                      <input
-                        type="number" // Pastikan type number agar muncul numpad di HP
-                        value={it.nta}
-                        onChange={(e) => updateItem(idx, "nta", e.target.value)}
-                        placeholder="Modal"
-                        className={`${createInvoiceStyles.input} border-orange-200 focus:border-orange-500`}
-                      />
-
-                      {/* LOGIKA WARNA & TEKS DINAMIS */}
-                      {(() => {
-                        const nilaiProfit =
-                          (it.unitPrice - (it.nta || 0)) * it.qty;
-                        const isRugi = nilaiProfit < 0;
-
-                        return (
-                          <div
-                            className={`text-[10px] mt-2 font-medium ${isRugi ? "text-red-600" : "text-green-600"}`}
+                      <div className="grid grid-cols-2 gap-2">
+                        {/* NTA */}
+                        <div>
+                          <label
+                            className={createInvoiceStyles.itemsFieldLabel}
+                            htmlFor={`nta-${idx}`}
                           >
-                            {isRugi ? "Rugi: " : "Profit: "}
-                            {currencyFmt(nilaiProfit, invoice.currency)}
-                          </div>
-                        );
-                      })()}
+                            NTA
+                          </label>
+                          <input
+                            id={`nta-${idx}`}
+                            type="number"
+                            value={it.nta}
+                            onChange={(e) =>
+                              updateItem(idx, "nta", e.target.value)
+                            }
+                            placeholder="Modal"
+                            className={`${createInvoiceStyles.input} border-orange-200 focus:border-orange-500`}
+                          />
+
+                          {(() => {
+                            const nilaiProfit =
+                              (it.unitPrice - (it.nta || 0)) * it.qty;
+                            const isRugi = nilaiProfit < 0;
+
+                            return (
+                              <div
+                                className={`text-[10px] mt-2 font-medium ${isRugi ? "text-red-600" : "text-green-600"}`}
+                              >
+                                {isRugi ? "Rugi: " : "Profit: "}
+                                {currencyFmt(nilaiProfit, invoice.currency)}
+                              </div>
+                            );
+                          })()}
+                        </div>
+
+                        {/* Supplier */}
+                        <div>
+                          <label
+                            className={createInvoiceStyles.itemsFieldLabel}
+                            htmlFor={`supplier-${idx}`}
+                          >
+                            Supplier
+                          </label>
+                          <input
+                            id={`supplier-${idx}`}
+                            className={createInvoiceStyles.input}
+                            value={it?.supplier ?? ""}
+                            onChange={(e) =>
+                              updateItem(idx, "supplier", e.target.value)
+                            }
+                            placeholder="Supplier"
+                          />
+                        </div>
+                      </div>
                     </div>
 
                     {/* Total */}
