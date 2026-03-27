@@ -295,11 +295,6 @@ export default function InvoicePreview() {
             <div className="border-t border-black w-32 mx-auto"></div>
           </div>
 
-          {/* Stamp di tengah (jika ada) */}
-          <div className="absolute top-0 left-1/2 -translate-x-1/2 ml-4">
-            <img src={stamp} className="h-30 w-auto" alt="Stamp" />
-          </div>
-
           <div className="text-center">
             <p>Disetujui Oleh</p>
 

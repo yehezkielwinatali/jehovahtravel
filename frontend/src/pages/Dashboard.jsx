@@ -215,27 +215,9 @@ const Dashboard = () => {
       setLoading(false);
     }
   }, [obtainToken, isSignedIn, storedInvoices.length]);
-  const fetchBusinessProfile = useCallback(async () => {
-    try {
-      const token = await obtainToken();
-      if (!token) return null;
-      if (res.status === 401) {
-        // silently ignore; profile not available
-        return;
-      }
-      if (!res.ok) return;
-      const json = await res.json().catch(() => null);
-      const data = json?.data || null;
-      if (data) setBusinessProfile(data);
-    } catch (err) {
-      // non-fatal
-      console.warn("Failed to fetch business profile:", err);
-    }
-  }, [obtainToken]);
 
   useEffect(() => {
     fetchInvoices();
-    fetchBusinessProfile();
 
     // Refresh saat kembali ke tab ini
     const onFocus = () => fetchInvoices();
@@ -251,7 +233,7 @@ const Dashboard = () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", onFocus);
     };
-  }, [fetchInvoices, fetchBusinessProfile, isSignedIn]);
+  }, [fetchInvoices, isSignedIn]);
 
   const kpis = useMemo(() => {
     const totalInvoices = storedInvoices.length;

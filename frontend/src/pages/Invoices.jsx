@@ -327,7 +327,7 @@ export default function InvoicesPage() {
       if (res.ok) {
         const raw = json?.data || [];
         const mapped = raw.map(normalizeInvoiceFromServer);
-        setAllInvoices(mapped); // <--- Menjadi ini
+        setAllInvoices(mapped);
         setError(null);
       }
     } catch (err) {
@@ -369,7 +369,7 @@ export default function InvoicesPage() {
           String(i.company || "")
             .toLowerCase()
             .includes(q) ||
-          hasMatchingItemName || // <--- BARU: Cek Nama Penumpang
+          hasMatchingItemName ||
           hasMatchingDescription
         );
       });

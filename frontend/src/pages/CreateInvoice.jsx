@@ -317,7 +317,29 @@ export default function CreateInvoice() {
       return next;
     });
   }
+  function removeItem(idx) {
+    setItems((arr) => {
+      const next = arr.filter((_, i) => i !== idx);
 
+      // optional: jangan sampai item habis semua
+      const safeNext =
+        next.length > 0
+          ? next
+          : [
+              {
+                id: uid(),
+                name: "",
+                description: "",
+                qty: 1,
+                unitPrice: 0,
+                nta: 0,
+              },
+            ];
+
+      setInvoice((inv) => (inv ? { ...inv, items: safeNext } : inv));
+      return safeNext;
+    });
+  }
   /* status & currency handlers */
   function handleStatusChange(newStatus) {
     setInvoice((inv) => (inv ? { ...inv, status: newStatus } : inv));
@@ -355,110 +377,6 @@ export default function CreateInvoice() {
         : inv,
     );
   }
-
-  /* ---------- helper: check candidate invoiceNumber exists on server/local ---------- */
-
-  /* ---------- generator: create a candidate and ensure uniqueness (tries up to N times) ---------- */
-
-  /* ---------- fetch business profile as soon as page loads (when signed in) ---------- */
-  useEffect(() => {
-    let mounted = true;
-
-    async function fetchBusinessProfile() {
-      if (!isSignedIn) return;
-      try {
-        const token = await obtainToken();
-        if (!token) return;
-        const res = await fetch(`${API_BASE}/api/businessProfile/me`, {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: "application/json",
-          },
-        });
-        if (!res.ok) {
-          // don't throw — just ignore profile if not accessible
-          return;
-        }
-        const json = await res.json().catch(() => null);
-        const data = json?.data || json || null;
-        if (!data || !mounted) return;
-
-        const serverProfile = {
-          businessName: data.businessName ?? "",
-          email: data.email ?? "",
-          address: data.address ?? "",
-          phone: data.phone ?? "",
-          gst: data.gst ?? "",
-          signatureOwnerName: data.signatureOwnerName ?? "",
-          signatureOwnerTitle: data.signatureOwnerTitle ?? "",
-          logoUrl: data.logoUrl ?? null,
-          stampUrl: data.stampUrl ?? null,
-          signatureUrl: data.signatureUrl ?? null,
-        };
-
-        setProfile(serverProfile);
-
-        // Merge into invoice only if those invoice fields are empty/unset
-        setInvoice((prev) => {
-          if (!prev) return prev;
-          const shouldOverwriteBusinessName =
-            !prev.fromBusinessName || prev.fromBusinessName.trim() === "";
-          const shouldOverwriteEmail =
-            !prev.fromEmail || prev.fromEmail.trim() === "";
-          const shouldOverwriteAddress =
-            !prev.fromAddress || prev.fromAddress.trim() === "";
-          const shouldOverwritePhone =
-            !prev.fromPhone || prev.fromPhone.trim() === "";
-          const shouldOverwriteGst =
-            !prev.fromGst || prev.fromGst.trim() === "";
-
-          const merged = {
-            ...prev,
-            fromBusinessName: shouldOverwriteBusinessName
-              ? serverProfile.businessName
-              : prev.fromBusinessName,
-            fromEmail: shouldOverwriteEmail
-              ? serverProfile.email
-              : prev.fromEmail,
-            fromAddress: shouldOverwriteAddress
-              ? serverProfile.address
-              : prev.fromAddress,
-            fromPhone: shouldOverwritePhone
-              ? serverProfile.phone
-              : prev.fromPhone,
-            fromGst: shouldOverwriteGst ? serverProfile.gst : prev.fromGst,
-            logoDataUrl:
-              prev.logoDataUrl ||
-              resolveImageUrl(serverProfile.logoUrl) ||
-              null,
-            stampDataUrl:
-              prev.stampDataUrl ||
-              resolveImageUrl(serverProfile.stampUrl) ||
-              null,
-            signatureDataUrl:
-              prev.signatureDataUrl ||
-              resolveImageUrl(serverProfile.signatureUrl) ||
-              null,
-            signatureName:
-              prev.signatureName || serverProfile.signatureOwnerName || "",
-            signatureTitle:
-              prev.signatureTitle || serverProfile.signatureOwnerTitle || "",
-          };
-
-          return merged;
-        });
-      } catch (err) {
-        console.warn("Failed to fetch business profile:", err);
-      }
-    }
-
-    fetchBusinessProfile();
-
-    return () => {
-      mounted = false;
-    };
-  }, [isSignedIn, obtainToken]);
 
   /* ---------- load invoice when editing (server first, fallback local) ---------- */
   useEffect(() => {
@@ -510,7 +428,12 @@ export default function CreateInvoice() {
             const json = await res.json().catch(() => null);
             const data = json?.data || json || null;
             if (data && mounted) {
-              const merged = { ...buildDefaultInvoice(), ...data };
+              const merged = {
+                ...buildDefaultInvoice(),
+                ...data,
+                issueDate: toDateInputValue(data.issueDate),
+                dueDate: toDateInputValue(data.dueDate),
+              };
               merged.id = data._id ?? data.id ?? merged.id;
               merged.invoiceNumber = data.invoiceNumber ?? merged.invoiceNumber;
 
@@ -773,6 +696,24 @@ export default function CreateInvoice() {
     navigate(`/app/invoices/${invoice.id}/preview`, {
       state: { invoice: prepared },
     });
+  }
+
+  function toDateInputValue(dateValue) {
+    if (!dateValue) return "";
+
+    const s = String(dateValue);
+
+    // kalau sudah format YYYY-MM-DD
+    if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
+
+    // kalau format ISO datetime, ambil 10 karakter pertama
+    const d = new Date(s);
+    if (Number.isNaN(d.getTime())) return "";
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   const totals = computeTotals(items, invoice?.downPayment || 0);
