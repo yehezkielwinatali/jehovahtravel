@@ -793,9 +793,14 @@ export default function CreateInvoice() {
             <label className={createInvoiceStyles.label}>Invoice Date</label>
             <input
               type="date"
-              value={invoice?.issueDate || ""}
-              onChange={(e) => updateInvoiceField("issueDate", e.target.value)}
-              className={createInvoiceStyles.input}
+              value={
+                invoice.issueDate
+                  ? new Date(invoice.issueDate).toISOString().split("T")[0]
+                  : ""
+              }
+              onChange={(e) =>
+                setInvoice({ ...invoice, issueDate: e.target.value })
+              }
             />
           </div>
 
@@ -803,9 +808,14 @@ export default function CreateInvoice() {
             <label className={createInvoiceStyles.label}>Due Date</label>
             <input
               type="date"
-              value={invoice?.dueDate || ""}
-              onChange={(e) => updateInvoiceField("dueDate", e.target.value)}
-              className={createInvoiceStyles.input}
+              value={
+                invoice.dueDate
+                  ? new Date(invoice.dueDate).toISOString().split("T")[0]
+                  : ""
+              }
+              onChange={(e) =>
+                setInvoice({ ...invoice, dueDate: e.target.value })
+              }
             />
           </div>
         </div>
