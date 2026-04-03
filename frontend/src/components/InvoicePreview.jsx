@@ -265,20 +265,45 @@ export default function InvoicePreview() {
           </tbody>
         </table>
 
-        {/* Bagian Perhitungan - Diletakkan di luar table agar penempatan bebas */}
-        <div className="flex justify-end mt-2">
-          <div className="w-[40%] text-[11px]">
-            <div className="flex justify-between p-1.5 border-b border-black">
-              <span className="italic">Subtotal</span>
-              <span>{currencyFmt(subtotal)}</span>
+        {/* Keterangan + Total Section */}
+        <div className="mt-3 flex justify-between items-start gap-6">
+          {/* Box Keterangan */}
+          <div className="w-[55%] border-2 border-black p-3 text-[11px] min-h-[120px]">
+            <p className="mb-3">
+              <span className="font-medium">Keterangan :</span>
+            </p>
+
+            <div className="space-y-2 leading-snug">
+              <p>
+                *) Note: Pembayaran dianggap LUNAS setelah Cheque / Giro Cair.
+              </p>
+
+              <p>
+                No Rek BCA : 1880169307 Chaterina Wong
+                <br />
+                No Rek Mandiri : 1410015858830 Chaterina Wong
+              </p>
+
+              {invoice?.notes && <p>{invoice.notes}</p>}
             </div>
-            <div className="flex justify-between p-1.5 border-b border-black">
-              <span className="italic">Uang Muka (DP)</span>
-              <span className="text-red-600">{currencyFmt(downPayment)}</span>
+          </div>
+
+          {/* Summary kanan */}
+          <div className="w-[32%] text-[11px]">
+            <div className="flex justify-between px-1 py-1">
+              <span>Uang Muka (DP)</span>
+              <span>{currencyFmt(downPayment)}</span>
             </div>
-            <div className="flex justify-between p-1.5 border-2 border-black mt-1 font-bold bg-gray-100 uppercase text-xs">
-              <span>Total</span>
-              <span>{currencyFmt(total)}</span>
+
+            <div className="mt-2 border-2 border-black">
+              <div className="flex">
+                <div className="w-1/2 border-r-2 border-black px-2 py-1 font-bold text-[12px]">
+                  Total
+                </div>
+                <div className="w-1/2 px-2 py-1 text-right font-bold text-[12px]">
+                  {currencyFmt(total)}
+                </div>
+              </div>
             </div>
           </div>
         </div>
