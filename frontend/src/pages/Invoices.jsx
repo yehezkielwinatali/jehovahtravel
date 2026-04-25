@@ -243,32 +243,41 @@ export default function InvoicesPage() {
 
   const [showExportModal, setShowExportModal] = useState(false);
   const [exportDate, setExportDate] = useState({
+    mode: "month",
     month: new Date().getMonth() + 1,
     year: new Date().getFullYear(),
+    startDate: "",
+    endDate: "",
   });
 
   const handleDownload = async () => {
     const token = await obtainToken();
-    const { month, year } = exportDate;
 
     try {
-      const res = await fetch(
-        `${API_BASE}/api/invoice/export/excel?month=${month}&year=${year}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      let url = `${API_BASE}/api/invoice/export/excel`;
+
+      if (exportDate.mode === "month") {
+        url += `?month=${exportDate.month}&year=${exportDate.year}`;
+      } else {
+        url += `?startDate=${exportDate.startDate}&endDate=${exportDate.endDate}`;
+      }
+
+      const res = await fetch(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       if (!res.ok) throw new Error("Gagal download");
 
       const blob = await res.blob();
-      const url = window.URL.createObjectURL(blob);
+      const fileUrl = window.URL.createObjectURL(blob);
+
       const a = document.createElement("a");
-      a.href = url;
-      a.download = `Rekap_Invoice_${month}_${year}.xlsx`;
+      a.href = fileUrl;
+      a.download = "Rekap_Invoice.xlsx";
       document.body.appendChild(a);
       a.click();
       a.remove();
+
       setShowExportModal(false);
     } catch (err) {
       alert("Gagal mendownload rekapan.");
@@ -490,59 +499,105 @@ export default function InvoicesPage() {
     <div className={invoicesStyles.pageContainer}>
       {showExportModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-9999">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-80">
-            <h3 className="text-lg font-bold mb-4">Pilih Periode Rekap</h3>
+          <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
+            <h3 className="text-lg font-bold mb-4">Export Rekapan</h3>
 
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm mb-1 text-gray-600">
-                  Bulan
-                </label>
-                <select
-                  className="w-full border p-2 rounded"
-                  value={exportDate.month}
-                  onChange={(e) =>
-                    setExportDate({ ...exportDate, month: e.target.value })
-                  }
-                >
-                  {Array.from({ length: 12 }, (_, i) => (
-                    <option key={i + 1} value={i + 1}>
-                      {new Date(0, i).toLocaleString("id-ID", {
-                        month: "long",
-                      })}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            <div className="mb-4">
+              <label className="block text-sm mb-2 text-gray-600">Mode</label>
 
-              <div>
-                <label className="block text-sm mb-1 text-gray-600">
-                  Tahun
-                </label>
-                <input
-                  type="number"
-                  className="w-full border p-2 rounded"
-                  value={exportDate.year}
-                  onChange={(e) =>
-                    setExportDate({ ...exportDate, year: e.target.value })
-                  }
-                />
-              </div>
+              <select
+                className="w-full border p-2 rounded"
+                value={exportDate.mode}
+                onChange={(e) =>
+                  setExportDate({ ...exportDate, mode: e.target.value })
+                }
+              >
+                <option value="month">Per Bulan</option>
+                <option value="range">Custom Tanggal</option>
+              </select>
+            </div>
 
-              <div className="flex gap-2 pt-2">
-                <button
-                  onClick={() => setShowExportModal(false)}
-                  className="flex-1 px-4 py-2 bg-gray-100 rounded-lg"
-                >
-                  Batal
-                </button>
-                <button
-                  onClick={handleDownload}
-                  className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg font-medium"
-                >
-                  Download
-                </button>
-              </div>
+            {exportDate.mode === "month" ? (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm mb-1">Bulan</label>
+                  <select
+                    className="w-full border p-2 rounded"
+                    value={exportDate.month}
+                    onChange={(e) =>
+                      setExportDate({ ...exportDate, month: e.target.value })
+                    }
+                  >
+                    {Array.from({ length: 12 }, (_, i) => (
+                      <option key={i + 1} value={i + 1}>
+                        {new Date(0, i).toLocaleString("id-ID", {
+                          month: "long",
+                        })}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm mb-1">Tahun</label>
+                  <input
+                    type="number"
+                    className="w-full border p-2 rounded"
+                    value={exportDate.year}
+                    onChange={(e) =>
+                      setExportDate({ ...exportDate, year: e.target.value })
+                    }
+                  />
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="mb-4">
+                  <label className="block text-sm mb-1">Tanggal Awal</label>
+                  <input
+                    type="date"
+                    className="w-full border p-2 rounded"
+                    value={exportDate.startDate}
+                    onChange={(e) =>
+                      setExportDate({
+                        ...exportDate,
+                        startDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+
+                <div className="mb-4">
+                  <label className="block text-sm mb-1">Tanggal Akhir</label>
+                  <input
+                    type="date"
+                    className="w-full border p-2 rounded"
+                    value={exportDate.endDate}
+                    onChange={(e) =>
+                      setExportDate({
+                        ...exportDate,
+                        endDate: e.target.value,
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
+
+            <div className="flex gap-2 pt-2">
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="flex-1 px-4 py-2 bg-gray-100 rounded-lg"
+              >
+                Batal
+              </button>
+
+              <button
+                onClick={handleDownload}
+                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg"
+              >
+                Download
+              </button>
             </div>
           </div>
         </div>

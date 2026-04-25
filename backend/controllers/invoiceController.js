@@ -96,8 +96,8 @@ export async function createInvoice(req, res) {
     // ✅ Tentukan tanggal dulu
     const issueDate = body.issueDate || getTodayLocal();
 
-    // ✅ Generate nomor berdasarkan issueDate yang sama
-    const invoiceNumber = await generateInvoiceNumber(userId, issueDate);
+    // nomor invoice pakai hari ini
+    const invoiceNumber = await generateInvoiceNumber(userId);
 
     const invoice = await Invoice.create({
       owner: userId,
@@ -320,17 +320,45 @@ export async function deleteInvoice(req, res) {
 
 export const exportInvoicesToExcel = async (req, res) => {
   try {
-    const { month, year } = req.query;
+    const { month, year, startDate, endDate } = req.query;
     const { userId: owner } = getAuth(req) || {};
 
-    const m = String(month).padStart(2, "0");
-    const startStr = `${year}-${m}-01`;
-    const lastDay = new Date(year, month, 0).getDate();
-    const endStr = `${year}-${m}-${String(lastDay).padStart(2, "0")}`;
+    if (!owner) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    let startStr;
+    let endStr;
+    let filename;
+
+    // Mode 1: custom range tanggal
+    if (startDate && endDate) {
+      startStr = startDate;
+      endStr = endDate;
+      filename = `Rekap_${startDate}_to_${endDate}.xlsx`;
+    }
+
+    // Mode 2: satu bulan
+    else if (month && year) {
+      const m = String(month).padStart(2, "0");
+      startStr = `${year}-${m}-01`;
+
+      const lastDay = new Date(year, month, 0).getDate();
+      endStr = `${year}-${m}-${String(lastDay).padStart(2, "0")}`;
+
+      filename = `Rekap_${m}_${year}.xlsx`;
+    } else {
+      return res.status(400).json({
+        message: "Isi startDate + endDate atau month + year",
+      });
+    }
 
     const invoices = await Invoice.find({
       owner,
-      issueDate: { $gte: startStr, $lte: endStr },
+      issueDate: {
+        $gte: startStr,
+        $lte: endStr,
+      },
     }).sort({ issueDate: 1 });
 
     const workbook = new ExcelJS.Workbook();
@@ -350,11 +378,6 @@ export const exportInvoicesToExcel = async (req, res) => {
     ];
 
     // Penampung Statistik
-    let totalOmzet = 0;
-    let omzetLunas = 0;
-    let omzetPiutang = 0;
-    let grandTotalNta = 0;
-    let grandTotalProfit = 0;
 
     let countPaid = 0;
     let countUnpaid = 0;
@@ -374,17 +397,11 @@ export const exportInvoicesToExcel = async (req, res) => {
       const nilaiNta = Number(inv.totalNta || 0);
       const nilaiProfit = Number(inv.profit || 0);
 
-      totalOmzet += nilaiTotal;
-      grandTotalNta += nilaiNta;
-      grandTotalProfit += nilaiProfit;
-
       const statusLower = (inv.status || "").toLowerCase();
 
       if (statusLower === "paid") {
-        omzetLunas += nilaiTotal;
         countPaid++;
       } else {
-        omzetPiutang += nilaiTotal;
         if (inv.dueDate && inv.dueDate < today) {
           countOverdue++;
         } else {
@@ -434,14 +451,8 @@ export const exportInvoicesToExcel = async (req, res) => {
     addSummaryRow("TOTAL PAID (LUNAS)", countPaid, false, "006400");
     addSummaryRow("TOTAL UNPAID (BELUM BAYAR)", countUnpaid, false, "0000FF");
     addSummaryRow("TOTAL OVERDUE (TELAT)", countOverdue, false, "FF0000");
-    addSummaryRow("TOTAL MODAL (NTA)", grandTotalNta, true, "E67E22"); // Warna Orange
-    addSummaryRow("TOTAL PROFIT BERSIH", grandTotalProfit, true, "006400"); // Warna Hijau
 
     worksheet.addRow([]); // Baris Kosong Lagi
-
-    addSummaryRow("TOTAL OMZET KESELURUHAN", totalOmzet, true);
-    addSummaryRow("TOTAL DIBAYAR (CASH IN)", omzetLunas, true, "006400");
-    addSummaryRow("TOTAL PIUTANG (PENDING)", omzetPiutang, true, "FF0000");
 
     // Header Bold
     worksheet.getRow(1).font = { bold: true };
@@ -450,10 +461,7 @@ export const exportInvoicesToExcel = async (req, res) => {
       "Content-Type",
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
-    res.setHeader(
-      "Content-Disposition",
-      `attachment; filename=Rekap_${month}_${year}.xlsx`,
-    );
+    res.setHeader("Content-Disposition", `attachment; filename=${filename}`);
 
     await workbook.xlsx.write(res);
     res.end();
