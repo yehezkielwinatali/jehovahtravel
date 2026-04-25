@@ -938,20 +938,6 @@ export default function InvoicesPage() {
                         >
                           <EyeIcon className={invoicesStyles.buttonIcon} /> View
                         </button>
-
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteInvoice(inv)}
-                          className={invoicesStyles.sendButton}
-                          title="Delete invoice"
-                          style={{
-                            background: "#ffefef",
-                            color: "#b91c1c",
-                            borderColor: "#fca5a5",
-                          }}
-                        >
-                          Delete
-                        </button>
                       </div>
                     </td>
                   </tr>
