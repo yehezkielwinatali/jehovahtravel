@@ -339,8 +339,7 @@ export const exportInvoicesToExcel = async (req, res) => {
       { header: "Tanggal", key: "issueDate", width: 15 },
       { header: "Nama Client", key: "clientName", width: 25 },
       { header: "Nama Penumpang", key: "passengerName", width: 25 },
-      { header: "Keterangan", key: "description", width: 30 },
-      { header: "Supplier", key: "supplier", width: 25 },
+      { header: "Keterangan", key: "description", width: 35 },
       { header: "Status", key: "status", width: 15 },
     ];
 
@@ -356,10 +355,6 @@ export const exportInvoicesToExcel = async (req, res) => {
     invoices.forEach((inv) => {
       const passengerNames = inv.items.map((item) => item.name).join(", ");
       const descriptions = inv.items.map((item) => item.description).join(", ");
-      const suppliers = inv.items
-        .map((item) => item.supplier || "-")
-        .join(", ");
-
       const statusLower = (inv.status || "").toLowerCase();
 
       if (statusLower === "paid") {
@@ -378,7 +373,6 @@ export const exportInvoicesToExcel = async (req, res) => {
         clientName: inv.client?.name || "-",
         passengerName: passengerNames || "-",
         description: descriptions || "-",
-        supplier: suppliers || "-",
         status: statusLower.toUpperCase(),
       });
     });
@@ -393,12 +387,9 @@ export const exportInvoicesToExcel = async (req, res) => {
       isCurrency = true,
       color = "000000",
     ) => {
-      const row = worksheet.addRow({
-        description: label,
-        supplier: value,
-      });
+      const row = worksheet.addRow({ description: label, status: value });
       row.font = { bold: true };
-      row.getCell("supplier").numFmt = "#,##0";
+      row.getCell("status").numFmt = "#,##0";
       row.getCell("description").font = { bold: true, color: { argb: color } };
       row.eachCell((c) => {
         c.fill = {
