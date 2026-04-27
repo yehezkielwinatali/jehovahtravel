@@ -18,22 +18,6 @@ function getTodayLocal() {
 /* ===============================
    COMPUTE TOTALS
 =================================*/
-function computeTotals(items = [], downPayment = 0) {
-  const safe = Array.isArray(items) ? items.filter(Boolean) : [];
-  const subtotal = safe.reduce((sum, item) => {
-    return sum + Number(item.qty || 0) * Number(item.unitPrice || 0);
-  }, 0);
-
-  const totalNta = safe.reduce((sum, item) => {
-    return sum + Number(item.qty || 0) * Number(item.nta || 0);
-  }, 0);
-
-  const dp = Number(downPayment) || 0;
-  const total = Math.max(subtotal - dp, 0);
-  const profit = subtotal - totalNta;
-
-  return { subtotal, downPayment: dp, total, totalNta, profit };
-}
 
 /* ===============================
    PARSE ITEMS & FILE HELPERS (Tetap sama)
@@ -90,7 +74,6 @@ export async function createInvoice(req, res) {
     // ⬇️ TAMBAHKAN LOG DI SINI ⬇️
     console.log("--- DEBUG SIMPAN BARU ---");
     console.log("Isi Items dari Frontend:", JSON.stringify(items, null, 2));
-    const totals = computeTotals(items, body.downPayment);
     const fileUrls = uploadedFilesToUrls(req);
 
     // ✅ Tentukan tanggal dulu
@@ -110,11 +93,6 @@ export async function createInvoice(req, res) {
       fromPhone: body.fromPhone || "",
       client: body.client || {},
       items,
-      subtotal: totals.subtotal,
-      downPayment: totals.downPayment,
-      totalNta: totals.totalNta, // TAMBAHKAN INI
-      profit: totals.profit,
-      total: totals.total,
       currency: body.currency || "IDR",
       status: body.status || "draft",
       signatureName: body.signatureName || "",
@@ -219,8 +197,6 @@ export async function updateInvoice(req, res) {
     // 1. Tentukan nilai item dan DP (Gunakan data lama jika data baru kosong)
     const items =
       body.items !== undefined ? parseItemsField(body.items) : existing.items;
-    const dp =
-      body.downPayment !== undefined ? body.downPayment : existing.downPayment;
 
     console.log("--- DEBUG UPDATE INVOICE ---");
     console.log("Items yang masuk ke DB:", JSON.stringify(items, null, 2));
@@ -242,7 +218,6 @@ export async function updateInvoice(req, res) {
     }
 
     // 3. Hitung total menggunakan variabel 'dp' yang sudah kita amankan tadi
-    const totals = computeTotals(items, dp);
     const fileUrls = uploadedFilesToUrls(req);
 
     const update = {
@@ -256,11 +231,6 @@ export async function updateInvoice(req, res) {
       fromGst: body.fromGst,
       client: body.client || existing.client,
       items,
-      subtotal: totals.subtotal,
-      total: totals.total,
-      downPayment: totals.downPayment, // Gunakan hasil dari computeTotals
-      totalNta: totals.totalNta, // TAMBAHKAN INI
-      profit: totals.profit,
       currency: body.currency,
       status: body.status ? String(body.status).toLowerCase() : undefined,
       logoDataUrl: fileUrls.logoDataUrl || body.logoDataUrl || undefined,
@@ -371,9 +341,6 @@ export const exportInvoicesToExcel = async (req, res) => {
       { header: "Nama Penumpang", key: "passengerName", width: 25 },
       { header: "Keterangan", key: "description", width: 30 },
       { header: "Supplier", key: "supplier", width: 25 },
-      { header: "Total", key: "total", width: 18 },
-      { header: "Total NTA (Modal)", key: "totalNta", width: 15 },
-      { header: "Profit", key: "profit", width: 15 },
       { header: "Status", key: "status", width: 15 },
     ];
 
@@ -392,10 +359,6 @@ export const exportInvoicesToExcel = async (req, res) => {
       const suppliers = inv.items
         .map((item) => item.supplier || "-")
         .join(", ");
-
-      const nilaiTotal = Number(inv.total || 0);
-      const nilaiNta = Number(inv.totalNta || 0);
-      const nilaiProfit = Number(inv.profit || 0);
 
       const statusLower = (inv.status || "").toLowerCase();
 
@@ -416,9 +379,6 @@ export const exportInvoicesToExcel = async (req, res) => {
         passengerName: passengerNames || "-",
         description: descriptions || "-",
         supplier: suppliers || "-",
-        total: nilaiTotal,
-        totalNta: nilaiNta,
-        profit: nilaiProfit,
         status: statusLower.toUpperCase(),
       });
     });
@@ -433,9 +393,12 @@ export const exportInvoicesToExcel = async (req, res) => {
       isCurrency = true,
       color = "000000",
     ) => {
-      const row = worksheet.addRow({ description: label, total: value });
+      const row = worksheet.addRow({
+        description: label,
+        supplier: value,
+      });
       row.font = { bold: true };
-      if (isCurrency) row.getCell("total").numFmt = "#,##0";
+      row.getCell("supplier").numFmt = "#,##0";
       row.getCell("description").font = { bold: true, color: { argb: color } };
       row.eachCell((c) => {
         c.fill = {
