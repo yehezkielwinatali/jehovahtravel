@@ -18,16 +18,20 @@ function getTodayLocal() {
 /* ===============================
    COMPUTE TOTALS
 =================================*/
-function computeTotals(items) {
+function computeTotals(items, downPayment = 0) {
   const subtotal = items.reduce((sum, item) => {
     const qty = Number(item.qty || 0);
     const unitPrice = Number(item.unitPrice || 0);
     return sum + qty * unitPrice;
   }, 0);
 
+  const dp = Number(downPayment || 0);
+  const total = Math.max(subtotal - dp, 0);
+
   return {
     subtotal,
-    total: subtotal,
+    downPayment: dp,
+    total,
   };
 }
 
@@ -82,8 +86,7 @@ export async function createInvoice(req, res) {
     const body = req.body || {};
 
     const items = parseItemsField(body.items);
-    const totals = computeTotals(items);
-
+    const totals = computeTotals(items, body.downPayment);
     // ⬇️ TAMBAHKAN LOG DI SINI ⬇️
     console.log("--- DEBUG SIMPAN BARU ---");
     console.log("Isi Items dari Frontend:", JSON.stringify(items, null, 2));
@@ -112,6 +115,7 @@ export async function createInvoice(req, res) {
       signatureTitle: body.signatureTitle || "",
       ...fileUrls,
       subtotal: totals.subtotal,
+      downPayment: totals.downPayment,
       total: totals.total,
     });
 
@@ -212,7 +216,10 @@ export async function updateInvoice(req, res) {
     // 1. Tentukan nilai item dan DP (Gunakan data lama jika data baru kosong)
     const items =
       body.items !== undefined ? parseItemsField(body.items) : existing.items;
-    const totals = computeTotals(items);
+    const dp =
+      body.downPayment !== undefined ? body.downPayment : existing.downPayment;
+
+    const totals = computeTotals(items, dp);
     console.log("--- DEBUG UPDATE INVOICE ---");
     console.log("Items yang masuk ke DB:", JSON.stringify(items, null, 2));
 
@@ -232,7 +239,6 @@ export async function updateInvoice(req, res) {
       }
     }
 
-    // 3. Hitung total menggunakan variabel 'dp' yang sudah kita amankan tadi
     const fileUrls = uploadedFilesToUrls(req);
 
     const update = {
@@ -255,6 +261,7 @@ export async function updateInvoice(req, res) {
       signatureName: body.signatureName,
       signatureTitle: body.signatureTitle,
       subtotal: totals.subtotal,
+      downPayment: totals.downPayment,
       total: totals.total,
     };
 
