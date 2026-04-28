@@ -18,6 +18,18 @@ function getTodayLocal() {
 /* ===============================
    COMPUTE TOTALS
 =================================*/
+function computeTotals(items) {
+  const subtotal = items.reduce((sum, item) => {
+    const qty = Number(item.qty || 0);
+    const unitPrice = Number(item.unitPrice || 0);
+    return sum + qty * unitPrice;
+  }, 0);
+
+  return {
+    subtotal,
+    total: subtotal,
+  };
+}
 
 /* ===============================
    PARSE ITEMS & FILE HELPERS (Tetap sama)
@@ -70,6 +82,7 @@ export async function createInvoice(req, res) {
     const body = req.body || {};
 
     const items = parseItemsField(body.items);
+    const totals = computeTotals(items);
 
     // ⬇️ TAMBAHKAN LOG DI SINI ⬇️
     console.log("--- DEBUG SIMPAN BARU ---");
@@ -98,6 +111,8 @@ export async function createInvoice(req, res) {
       signatureName: body.signatureName || "",
       signatureTitle: body.signatureTitle || "",
       ...fileUrls,
+      subtotal: totals.subtotal,
+      total: totals.total,
     });
 
     return res.status(201).json(invoice);
@@ -197,7 +212,7 @@ export async function updateInvoice(req, res) {
     // 1. Tentukan nilai item dan DP (Gunakan data lama jika data baru kosong)
     const items =
       body.items !== undefined ? parseItemsField(body.items) : existing.items;
-
+    const totals = computeTotals(items);
     console.log("--- DEBUG UPDATE INVOICE ---");
     console.log("Items yang masuk ke DB:", JSON.stringify(items, null, 2));
 
@@ -239,6 +254,8 @@ export async function updateInvoice(req, res) {
         fileUrls.signatureDataUrl || body.signatureDataUrl || undefined,
       signatureName: body.signatureName,
       signatureTitle: body.signatureTitle,
+      subtotal: totals.subtotal,
+      total: totals.total,
     };
 
     // Bersihkan field yang undefined
