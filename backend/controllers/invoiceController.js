@@ -364,8 +364,11 @@ export const exportInvoicesToExcel = async (req, res) => {
       { header: "Nama Client", key: "clientName", width: 25 },
       { header: "Nama Penumpang", key: "passengerName", width: 25 },
       { header: "Keterangan", key: "description", width: 35 },
+      { header: "Total Invoice", key: "total", width: 18 },
       { header: "Status", key: "status", width: 15 },
     ];
+
+    worksheet.getColumn("total").numFmt = "#,##0";
 
     // Penampung Statistik
 
@@ -398,6 +401,7 @@ export const exportInvoicesToExcel = async (req, res) => {
         passengerName: passengerNames || "-",
         description: descriptions || "-",
         status: statusLower.toUpperCase(),
+        total: inv.total || 0,
       });
     });
 
