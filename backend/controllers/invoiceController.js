@@ -364,12 +364,13 @@ export const exportInvoicesToExcel = async (req, res) => {
       { header: "Nama Client", key: "clientName", width: 25 },
       { header: "Nama Penumpang", key: "passengerName", width: 25 },
       { header: "Keterangan", key: "description", width: 35 },
+      { header: "NTA", key: "nta", width: 20 },
       { header: "Total Invoice", key: "total", width: 18 },
       { header: "Status", key: "status", width: 15 },
     ];
 
     worksheet.getColumn("total").numFmt = "#,##0";
-
+    worksheet.getColumn("nta").numFmt = "#,##0";
     // Penampung Statistik
 
     let countPaid = 0;
@@ -383,6 +384,7 @@ export const exportInvoicesToExcel = async (req, res) => {
       const passengerNames = inv.items.map((item) => item.name).join(", ");
       const descriptions = inv.items.map((item) => item.description).join(", ");
       const statusLower = (inv.status || "").toLowerCase();
+      const ntas = inv.items.map((item) => item.nta).join(", ");
 
       if (statusLower === "paid") {
         countPaid++;
@@ -400,6 +402,7 @@ export const exportInvoicesToExcel = async (req, res) => {
         clientName: inv.client?.name || "-",
         passengerName: passengerNames || "-",
         description: descriptions || "-",
+        nta: ntas || "-",
         status: statusLower.toUpperCase(),
         total: inv.total || 0,
       });
