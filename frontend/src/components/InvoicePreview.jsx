@@ -190,7 +190,7 @@ export default function InvoicePreview() {
           <div className="border-r border-black pr-4 min-h-22.5 relative">
             <p className="text-[10px] italic">Kepada :</p>
             <p className="font-bold text-sm uppercase">
-              {invoice.client?.name || "YULLI"}
+              {invoice.client?.name || "N/A"}
             </p>
 
             <div className="absolute bottom-1 w-full pr-8 flex justify-between text-[10px]">

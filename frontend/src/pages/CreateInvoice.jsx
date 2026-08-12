@@ -3,40 +3,51 @@ import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import StatusBadge from "../components/StatusBadge";
 import {
-  createInvoiceStyles,
-  createInvoiceIconColors,
-  createInvoiceCustomStyles,
-} from "../assets/dummyStyles";
+  Eye,
+  Save,
+  Plus,
+  PenTool,
+  FileText,
+  User,
+  ListChecks,
+  Wallet,
+  CheckCircle2,
+  AlertTriangle,
+  Info,
+  X,
+} from "lucide-react";
 
 /* ---------- API BASE ---------- */
 const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL;
 
-/* ---------- storage helpers (unchanged) ---------- */
-/* ----------------- frontend-only: normalize image URLs ----------------- */
+/* ---------- helpers (unchanged logic) ---------- */
+
 function resolveImageUrl(url) {
   if (!url) return null;
+
   const s = String(url).trim();
 
-  // keep data/blobs as-is
-  if (s.startsWith("data:") || s.startsWith("blob:")) return s;
+  if (s.startsWith("data:") || s.startsWith("blob:")) {
+    return s;
+  }
 
-  // absolute http(s)
   if (/^https?:\/\//i.test(s)) {
     try {
       const parsed = new URL(s);
+
       if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-        // rewrite localhost -> API_BASE (preserve path/search/hash)
         const path =
           parsed.pathname + (parsed.search || "") + (parsed.hash || "");
+
         return `${API_BASE.replace(/\/+$/, "")}${path}`;
       }
+
       return parsed.href;
     } catch (e) {
       // fall through to relative handling
     }
   }
 
-  // relative paths like "/uploads/..." or "uploads/..." -> prefix with API_BASE
   return `${API_BASE.replace(/\/+$/, "")}/${s.replace(/^\/+/, "")}`;
 }
 
@@ -55,7 +66,6 @@ function writeJSON(key, val) {
   } catch {}
 }
 
-/* ---------- local invoices helpers (fallback) ---------- */
 function getStoredInvoices() {
   return readJSON("invoices_v1", []) || [];
 }
@@ -63,7 +73,6 @@ function saveStoredInvoices(arr) {
   writeJSON("invoices_v1", arr);
 }
 
-/* ---------- util ---------- */
 function uid() {
   try {
     if (typeof crypto !== "undefined" && crypto.randomUUID)
@@ -71,20 +80,19 @@ function uid() {
   } catch {}
   return Math.random().toString(36).slice(2, 9);
 }
+
 function currencyFmt(amount = 0, currency = "IDR") {
   try {
     if (currency === "IDR") {
       return new Intl.NumberFormat("id-ID", {
-        // Pakai id-ID agar pemisah ribuan adalah titik
         style: "currency",
         currency: "IDR",
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
       })
         .format(amount)
-        .replace(/(\s)/g, ""); // Menghapus spasi aneh jika ada
+        .replace(/(\s)/g, "");
     }
-
     return new Intl.NumberFormat("en-US", {
       style: "currency",
       currency: "USD",
@@ -95,34 +103,23 @@ function currencyFmt(amount = 0, currency = "IDR") {
     return `${currency} ${amount}`;
   }
 }
+
 function computeTotals(items = [], downPayment = 0) {
   const safe = Array.isArray(items) ? items.filter(Boolean) : [];
-
   const subtotal = safe.reduce(
     (s, it) => s + Number(it.qty || 0) * Number(it.unitPrice || 0),
     0,
   );
-
-  // Calculate total NTA from items
   const totalNta = safe.reduce(
     (s, it) => s + Number(it.qty || 0) * Number(it.nta || 0),
     0,
   );
-
   const dp = Number(downPayment || 0);
   const total = subtotal - dp;
-  const profit = subtotal - totalNta; // Gross profit calculation
-
-  return {
-    subtotal,
-    downPayment: dp,
-    total,
-    totalNta,
-    profit,
-  };
+  const profit = subtotal - totalNta;
+  return { subtotal, downPayment: dp, total, totalNta, profit };
 }
 
-/* ---------- helper: convert dataURL to File ---------- */
 function dataURLtoFile(dataurl, filename = "file") {
   if (!dataurl || dataurl.indexOf(",") === -1) return null;
   const arr = dataurl.split(",");
@@ -131,9 +128,7 @@ function dataURLtoFile(dataurl, filename = "file") {
   const bstr = atob(arr[1]);
   let n = bstr.length;
   const u8arr = new Uint8Array(n);
-  while (n--) {
-    u8arr[n] = bstr.charCodeAt(n);
-  }
+  while (n--) u8arr[n] = bstr.charCodeAt(n);
   try {
     return new File([u8arr], filename, { type: mime });
   } catch {
@@ -143,83 +138,129 @@ function dataURLtoFile(dataurl, filename = "file") {
   }
 }
 
-/* ---------- icons ---------- (kept same as before) */
-const PreviewIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const SaveIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z" />
-    <polyline points="17 21 17 13 7 13 7 21" />
-    <polyline points="7 3 7 8 15 8" />
-  </svg>
-);
-const UploadIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
+/* ------------------------------------------------------------------ */
+/* Small presentational pieces */
+/* ------------------------------------------------------------------ */
 
-const AddIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M12 5v14m-7-7h14" />
-  </svg>
-);
+function Card({ icon: Icon, title, subtitle, right, children }) {
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+      {(Icon || title) && (
+        <div className="mb-5 flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            {Icon && (
+              <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 ring-1 ring-inset ring-indigo-100">
+                <Icon className="h-4 w-4 text-indigo-600" />
+              </div>
+            )}
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+              {subtitle && <p className="text-xs text-slate-500">{subtitle}</p>}
+            </div>
+          </div>
+          {right}
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function Field({ label, htmlFor, children }) {
+  return (
+    <div>
+      {label && (
+        <label
+          htmlFor={htmlFor}
+          className="mb-1.5 block text-xs font-medium text-slate-500"
+        >
+          {label}
+        </label>
+      )}
+      {children}
+    </div>
+  );
+}
+
+const inputClass =
+  "w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-800 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300";
+
+const TOAST_STYLES = {
+  success: {
+    icon: CheckCircle2,
+    iconText: "text-emerald-600",
+    iconBg: "bg-emerald-50",
+    bar: "bg-emerald-500",
+  },
+  error: {
+    icon: AlertTriangle,
+    iconText: "text-rose-600",
+    iconBg: "bg-rose-50",
+    bar: "bg-rose-500",
+  },
+  info: {
+    icon: Info,
+    iconText: "text-indigo-600",
+    iconBg: "bg-indigo-50",
+    bar: "bg-indigo-500",
+  },
+};
+
+function Toast({ toast, onClose }) {
+  const cfg = TOAST_STYLES[toast?.type] || TOAST_STYLES.info;
+  const Icon = cfg.icon;
+  return (
+    <div
+      className={`pointer-events-none fixed inset-x-0 top-6 z-[9999] flex justify-center px-4 transition-all duration-300 ${
+        toast ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+      }`}
+    >
+      {toast && (
+        <div className="pointer-events-auto relative flex w-full max-w-sm items-start gap-3 overflow-hidden rounded-xl border border-slate-200 bg-white p-3.5 pl-4 shadow-xl">
+          <span className={`absolute inset-y-0 left-0 w-1 ${cfg.bar}`} />
+          <div
+            className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${cfg.iconBg}`}
+          >
+            <Icon className={`h-4 w-4 ${cfg.iconText}`} />
+          </div>
+          <p className="flex-1 pt-1 text-sm text-slate-700">{toast.message}</p>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Dismiss notification"
+            className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+          >
+            <X className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
 
 /* ---------- Component (Create / Edit Invoice) ---------- */
 export default function CreateInvoice() {
   const navigate = useNavigate();
-  const { id } = useParams(); // if editing, id will be present
+  const { id } = useParams();
   const loc = useLocation();
   const invoiceFromState =
     loc.state && loc.state.invoice ? loc.state.invoice : null;
   const isEditing = Boolean(id && id !== "new");
 
-  // Clerk auth hooks
   const { getToken, isSignedIn } = useAuth();
 
-  // helper to obtain token with a retry
   const obtainToken = useCallback(async () => {
     if (typeof getToken !== "function") return null;
     try {
       let token = await getToken({ template: "default" }).catch(() => null);
-      if (!token) {
+      if (!token)
         token = await getToken({ forceRefresh: true }).catch(() => null);
-      }
       return token;
     } catch (err) {
       return null;
     }
   }, [getToken]);
+
   function getTodayLocal() {
     const now = new Date();
     const y = now.getFullYear();
@@ -228,13 +269,11 @@ export default function CreateInvoice() {
     return `${y}-${m}-${d}`;
   }
 
-  // invoice & items state
   function buildDefaultInvoice() {
-    // Use a safe client-side local id for previews and local storage.
     const localId = uid();
     return {
-      id: localId, // local preview id (server will return _id after save)
-      invoiceNumber: "", // will be set on creation by generator
+      id: localId,
+      invoiceNumber: "",
       issueDate: getTodayLocal(),
       dueDate: "",
       fromBusinessName: "",
@@ -267,12 +306,22 @@ export default function CreateInvoice() {
 
   const [invoice, setInvoice] = useState(() => buildDefaultInvoice());
   const [items, setItems] = useState(invoice.items || []);
+
   const [loading, setLoading] = useState(false);
-
-  // profile fetched from server
   const [profile, setProfile] = useState(null);
+  const [toast, setToast] = useState(null);
+  const [itemErrors, setItemErrors] = useState({});
 
-  /* ---------- helpers for invoice editing ---------- */
+  const notify = useCallback((type, message) => {
+    setToast({ type, message, key: Date.now() });
+  }, []);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
   function updateInvoiceField(field, value) {
     setInvoice((inv) => (inv ? { ...inv, [field]: value } : inv));
   }
@@ -286,14 +335,11 @@ export default function CreateInvoice() {
     setItems((arr) => {
       const copy = [...arr];
       const it = { ...(copy[idx] || {}) };
-
-      // Jika kuncinya adalah 'description' atau 'name', simpan sebagai teks (string)
       if (key === "description" || key === "name" || key === "supplier") {
         it[key] = value;
       } else {
         it[key] = Number(value) || 0;
       }
-
       copy[idx] = it;
       setInvoice((inv) => (inv ? { ...inv, items: copy } : inv));
       return copy;
@@ -309,7 +355,6 @@ export default function CreateInvoice() {
       nta: 0,
       supplier: "",
     };
-
     setItems((arr) => {
       const next = [...arr, it];
       setInvoice((inv) => (inv ? { ...inv, items: next } : inv));
@@ -319,8 +364,6 @@ export default function CreateInvoice() {
   function removeItem(idx) {
     setItems((arr) => {
       const next = arr.filter((_, i) => i !== idx);
-
-      // optional: jangan sampai item habis semua
       const safeNext =
         next.length > 0
           ? next
@@ -335,12 +378,11 @@ export default function CreateInvoice() {
                 supplier: "",
               },
             ];
-
       setInvoice((inv) => (inv ? { ...inv, items: safeNext } : inv));
       return safeNext;
     });
   }
-  /* status & currency handlers */
+
   function handleStatusChange(newStatus) {
     setInvoice((inv) => (inv ? { ...inv, status: newStatus } : inv));
   }
@@ -348,7 +390,6 @@ export default function CreateInvoice() {
     setInvoice((inv) => (inv ? { ...inv, currency: newCurrency } : inv));
   }
 
-  /* images - keep as data URLs in the invoice object */
   function handleImageUpload(file, kind = "logo") {
     if (!file) return;
     const reader = new FileReader();
@@ -378,16 +419,12 @@ export default function CreateInvoice() {
     );
   }
 
-  /* ---------- load invoice when editing (server first, fallback local) ---------- */
   useEffect(() => {
     let mounted = true;
 
     async function prepare() {
-      // If AI/Gemini passed an invoice via location.state
       if (invoiceFromState) {
-        // merge then normalize any image URLs that may be `http://localhost:...`
         const base = { ...buildDefaultInvoice(), ...invoiceFromState };
-
         base.logoDataUrl =
           resolveImageUrl(base.logoDataUrl ?? base.logoUrl ?? base.logo) ||
           null;
@@ -400,7 +437,6 @@ export default function CreateInvoice() {
           ) || null;
 
         setInvoice(base);
-
         setItems(
           Array.isArray(invoiceFromState.items)
             ? invoiceFromState.items.slice()
@@ -408,11 +444,9 @@ export default function CreateInvoice() {
               ? [...invoiceFromState.items]
               : buildDefaultInvoice().items,
         );
-
         return;
       }
 
-      // If editing and no invoiceFromState then fetch from server (or local fallback)
       if (isEditing && !invoiceFromState) {
         setLoading(true);
         try {
@@ -437,7 +471,6 @@ export default function CreateInvoice() {
               merged.id = data._id ?? data.id ?? merged.id;
               merged.invoiceNumber = data.invoiceNumber ?? merged.invoiceNumber;
 
-              // normalize server-returned image fields (rewrite localhost/relative -> API_BASE)
               merged.logoDataUrl =
                 resolveImageUrl(
                   data.logoDataUrl ?? data.logoUrl ?? data.logo,
@@ -466,7 +499,6 @@ export default function CreateInvoice() {
             }
           }
         } catch (err) {
-          // ignore and fallback
           console.warn(
             "Server invoice fetch failed, will fallback to local:",
             err,
@@ -475,14 +507,12 @@ export default function CreateInvoice() {
           setLoading(false);
         }
 
-        // fallback to local storage
         const all = getStoredInvoices();
         const found = all.find(
           (x) => x && (x.id === id || x._id === id || x.invoiceNumber === id),
         );
         if (found && mounted) {
           const fixed = { ...buildDefaultInvoice(), ...found };
-
           fixed.logoDataUrl =
             resolveImageUrl(found.logoDataUrl ?? found.logoUrl ?? found.logo) ||
             fixed.logoDataUrl ||
@@ -507,33 +537,50 @@ export default function CreateInvoice() {
               : buildDefaultInvoice().items,
           );
         }
-
         return;
       }
 
-      // Creating new (neither editing nor invoiceFromState)
-      // Build default invoice then generate unique invoiceNumber and set it
-      setInvoice((prev) => ({ ...buildDefaultInvoice(), ...prev }));
-      setItems(buildDefaultInvoice().items);
+      const defaultInvoice = buildDefaultInvoice();
 
-      // generate unique invoice number for new invoices
+      setInvoice((prev) => ({
+        ...defaultInvoice,
+        ...prev,
+      }));
+
+      setItems(defaultInvoice.items);
     }
 
     prepare();
-
     return () => {
       mounted = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, invoiceFromState, isEditing, obtainToken]);
 
-  /* ---------- Save invoice to backend (POST or PUT) using Clerk token ---------- */
   async function handleSave() {
     if (!invoice) return;
-    setLoading(true);
+    const errors = {};
 
+    items.forEach((item, index) => {
+      if (!String(item.description || "").trim()) {
+        errors[index] = {
+          ...(errors[index] || {}),
+          description: true,
+        };
+      }
+    });
+
+    if (Object.keys(errors).length > 0) {
+      setItemErrors(errors);
+
+      notify("error", "Description wajib diisi.");
+      return;
+    }
+
+    setItemErrors({});
+
+    setLoading(true);
     try {
-      // Build prepared object but OMIT invoiceNumber when empty so server auto-generates.
       const totals = computeTotals(items, invoice.downPayment);
 
       const prepared = {
@@ -559,7 +606,6 @@ export default function CreateInvoice() {
         localId: invoice.id,
       };
 
-      // include invoiceNumber only if provided (we prefill for new invoices)
       if (isEditing && invoice.invoiceNumber) {
         prepared.invoiceNumber = invoice.invoiceNumber.trim();
       }
@@ -570,7 +616,6 @@ export default function CreateInvoice() {
           : `${API_BASE}/api/invoice`;
       const method = isEditing && invoice.id ? "PUT" : "POST";
 
-      // try to obtain Clerk token; if present include Authorization
       const token = await obtainToken();
       const headers = { "Content-Type": "application/json" };
       if (token) headers["Authorization"] = `Bearer ${token}`;
@@ -581,24 +626,26 @@ export default function CreateInvoice() {
         body: JSON.stringify(prepared),
       });
 
-      // handle conflict (409) when user supplied invoiceNumber already exists
       if (res.status === 409) {
         const json = await res.json().catch(() => null);
         const message = json?.message || "Invoice number already exists.";
-        // Let the user decide — do not auto-retry; they may want to pick a different number.
         throw new Error(message);
       }
 
       const json = await res.json().catch(() => null);
+
       if (!res.ok) {
         const msg = json?.message || `Save failed (${res.status})`;
-        throw new Error(msg);
+
+        const error = new Error(msg);
+        error.status = res.status;
+
+        throw error;
       }
 
       const saved = json?.data || json || null;
       const savedId = saved?._id ?? saved?.id ?? invoice.id;
 
-      // Use server-provided invoiceNumber (if server generated one)
       const merged = {
         ...prepared,
         id: savedId,
@@ -613,7 +660,6 @@ export default function CreateInvoice() {
       setInvoice((inv) => ({ ...inv, ...merged }));
       setItems(Array.isArray(saved?.items) ? saved.items : items);
 
-      // update local stored invoices (keep local fallback in sync)
       const all = getStoredInvoices();
       if (isEditing) {
         const idx = all.findIndex(
@@ -626,60 +672,38 @@ export default function CreateInvoice() {
         if (idx >= 0) all[idx] = merged;
         else all.unshift(merged);
       } else {
-        // For newly created, use server's invoiceNumber/id if provided
         all.unshift(merged);
       }
       saveStoredInvoices(all);
 
-      alert(`Invoice ${isEditing ? "updated" : "created"} successfully.`);
-      navigate("/app/invoices");
+      notify(
+        "success",
+        `Invoice ${isEditing ? "updated" : "created"} successfully.`,
+      );
+      setTimeout(() => navigate("/app/invoices"), 900);
     } catch (err) {
       console.error("Failed to save invoice to server:", err);
 
-      // If it was a 409 conflict (duplicate invoice number provided by user), show message and let user fix.
+      if (err.status === 400) {
+        notify("error", err.message || "Invoice data is invalid.");
+        return;
+      }
+
       if (
+        err.status === 409 ||
         String(err?.message || "")
           .toLowerCase()
           .includes("invoice number")
       ) {
-        alert(err.message || "Invoice number already exists. Choose another.");
-        setLoading(false);
+        notify("error", err.message || "Invoice number already exists.");
         return;
       }
 
-      // fallback: save locally
-      try {
-        const all = getStoredInvoices();
-        const totals = computeTotals(items, invoice.downPayment);
-
-        const preparedLocal = {
-          ...invoice,
-          items,
-
-          subtotal: totals.subtotal,
-          downPayment: totals.downPayment,
-          total: totals.total,
-        };
-        if (isEditing) {
-          const idx = all.findIndex(
-            (x) =>
-              x &&
-              (x.id === invoice.id ||
-                x._id === invoice.id ||
-                x.invoiceNumber === invoice.invoiceNumber),
-          );
-          if (idx >= 0) all[idx] = preparedLocal;
-          else all.unshift(preparedLocal);
-        } else {
-          all.unshift(preparedLocal);
-        }
-        saveStoredInvoices(all);
-        alert("Saved locally as fallback (server error).");
-        navigate("/app/invoices");
-      } catch (localErr) {
-        console.error("Local fallback failed:", localErr);
-        alert(err?.message || "Save failed. See console.");
-      }
+      // Jangan anggap berhasil kalau server gagal
+      notify(
+        "error",
+        err?.message || "Failed to save invoice. Please try again.",
+      );
     } finally {
       setLoading(false);
     }
@@ -700,16 +724,10 @@ export default function CreateInvoice() {
 
   function toDateInputValue(dateValue) {
     if (!dateValue) return "";
-
     const s = String(dateValue);
-
-    // kalau sudah format YYYY-MM-DD
     if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
-
-    // kalau format ISO datetime, ambil 10 karakter pertama
     const d = new Date(s);
     if (Number.isNaN(d.getTime())) return "";
-
     const year = d.getFullYear();
     const month = String(d.getMonth() + 1).padStart(2, "0");
     const day = String(d.getDate()).padStart(2, "0");
@@ -717,468 +735,314 @@ export default function CreateInvoice() {
   }
 
   const totals = computeTotals(items, invoice?.downPayment || 0);
-  /* ---------- JSX (kept structure, invoiceNumber input prefills generated value) ---------- */
+
+  const STATUS_OPTIONS = [
+    { value: "draft", label: "Draft" },
+    { value: "unpaid", label: "Unpaid" },
+    { value: "paid", label: "Paid" },
+    { value: "overdue", label: "Overdue" },
+  ];
+
   return (
-    <div className={createInvoiceStyles.pageContainer}>
-      {/* Header Section */}
-      <div className={createInvoiceStyles.headerContainer}>
+    <div className="w-full font-[Inter] text-slate-700">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
+
+      {/* Header */}
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className={createInvoiceStyles.headerTitle}>
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-100">
+            {isEditing ? "Edit" : "New"}
+          </span>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
             {isEditing ? "Edit Invoice" : "Create New Invoice"}
           </h1>
-          <p className={createInvoiceStyles.headerSubtitle}>
+          <p className="mt-1 text-sm text-slate-500">
             {isEditing
               ? "Update invoice details and items below"
               : "Fill in invoice details, add line items, and configure branding"}
           </p>
         </div>
 
-        <div className={createInvoiceStyles.headerButtonContainer}>
-          <button
-            onClick={handlePreview}
-            className={createInvoiceStyles.previewButton}
-          >
-            <PreviewIcon className="w-4 h-4" />
-            Preview
-          </button>
+        <div className="flex items-center gap-2">
           <button
             onClick={handleSave}
             disabled={loading}
-            className={createInvoiceStyles.saveButton}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           >
-            <SaveIcon className="w-4 h-4" />
+            <Save className="h-4 w-4" />
             {loading
-              ? "Saving..."
+              ? "Saving…"
               : isEditing
                 ? "Update Invoice"
                 : "Create Invoice"}
           </button>
         </div>
       </div>
-      {/* Invoice Header Section */}
-      <div className={createInvoiceStyles.cardContainer}>
-        <div className={createInvoiceStyles.cardHeaderContainer}>
-          <div
-            className={`${createInvoiceStyles.cardIconContainer} ${createInvoiceIconColors.invoice}`}
-          >
-            <svg
-              className="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-            >
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-              <polyline points="14 2 14 8 20 8" />
-              <line x1="16" y1="13" x2="8" y2="13" />
-              <line x1="16" y1="17" x2="8" y2="17" />
-              <polyline points="10 9 9 9 8 9" />
-            </svg>
-          </div>
-          <h2 className={createInvoiceStyles.cardTitle}>Invoice Details</h2>
-        </div>
 
-        <div className={createInvoiceStyles.gridCols3}>
-          <div>
-            <label className={createInvoiceStyles.label}>Invoice Date</label>
+      {/* Invoice details */}
+      <Card
+        icon={FileText}
+        title="Invoice Details"
+        subtitle="Dates, currency, and status"
+      >
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Invoice Date" htmlFor="issueDate">
             <input
+              id="issueDate"
               type="date"
-              value={
-                invoice.issueDate
-                  ? new Date(invoice.issueDate).toISOString().split("T")[0]
-                  : ""
-              }
+              value={toDateInputValue(invoice.issueDate)}
               onChange={(e) =>
                 setInvoice({ ...invoice, issueDate: e.target.value })
               }
+              className={inputClass}
             />
-          </div>
-
-          <div>
-            <label className={createInvoiceStyles.label}>Due Date</label>
+          </Field>
+          <Field label="Due Date" htmlFor="dueDate">
             <input
+              id="dueDate"
               type="date"
-              value={
-                invoice.dueDate
-                  ? new Date(invoice.dueDate).toISOString().split("T")[0]
-                  : ""
-              }
+              value={toDateInputValue(invoice.dueDate)}
               onChange={(e) =>
                 setInvoice({ ...invoice, dueDate: e.target.value })
               }
+              className={inputClass}
             />
-          </div>
+          </Field>
         </div>
 
-        {/* Currency and Status Section */}
-        <div className={createInvoiceStyles.currencyStatusGrid}>
-          {/* Currency Selection */}
+        <div className="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-2">
           <div>
-            <label className={createInvoiceStyles.labelWithMargin}>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
               Currency
             </label>
-            <div className={createInvoiceStyles.currencyContainer}>
-              <button
-                onClick={() => handleCurrencyChange("IDR")}
-                className={`${createInvoiceStyles.currencyButton} ${
-                  invoice.currency === "IDR"
-                    ? createInvoiceStyles.currencyButtonActive1
-                    : createInvoiceStyles.currencyButtonInactive
-                }`}
-              >
-                <span className={createInvoiceCustomStyles.currencySymbol}>
-                  Rp
-                </span>
-                <div className="text-left">
-                  <div className="font-medium">Rp</div>
-                  <div className="text-xs opacity-70">IDR</div>
-                </div>
-              </button>
-
-              <button
-                onClick={() => handleCurrencyChange("USD")}
-                className={`${createInvoiceStyles.currencyButton} ${
-                  invoice.currency === "USD"
-                    ? createInvoiceStyles.currencyButtonActive2
-                    : createInvoiceStyles.currencyButtonInactive
-                }`}
-              >
-                <span className={createInvoiceCustomStyles.currencySymbol}>
-                  $
-                </span>
-                <div className="text-left">
-                  <div className="font-medium">US Dollar</div>
-                  <div className="text-xs opacity-70">USD</div>
-                </div>
-              </button>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { code: "IDR", symbol: "Rp", name: "Rupiah" },
+                { code: "USD", symbol: "$", name: "US Dollar" },
+              ].map((c) => (
+                <button
+                  key={c.code}
+                  type="button"
+                  onClick={() => handleCurrencyChange(c.code)}
+                  className={`flex items-center gap-2 rounded-lg border px-3 py-2.5 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
+                    invoice.currency === c.code
+                      ? "border-indigo-200 bg-indigo-50 text-indigo-700"
+                      : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="font-semibold">{c.symbol}</span>
+                  <span className="text-xs opacity-80">{c.code}</span>
+                </button>
+              ))}
             </div>
           </div>
 
-          {/* Status Selection */}
           <div>
-            <label className={createInvoiceStyles.labelWithMargin}>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
               Status
             </label>
-            <div className={createInvoiceStyles.statusContainer}>
-              {[
-                { value: "draft", label: "Draft" },
-                { value: "unpaid", label: "Unpaid" },
-                { value: "paid", label: "Paid" },
-                { value: "overdue", label: "Overdue" },
-              ].map((status) => (
+            <div className="flex flex-wrap gap-2">
+              {STATUS_OPTIONS.map((s) => (
                 <button
-                  key={status.value}
-                  onClick={() => handleStatusChange(status.value)}
-                  className={`${createInvoiceStyles.statusButton} ${
-                    invoice.status === status.value
-                      ? createInvoiceStyles.statusButtonActive
-                      : createInvoiceStyles.statusButtonInactive
+                  key={s.value}
+                  type="button"
+                  onClick={() => handleStatusChange(s.value)}
+                  className={`rounded-lg border px-1 py-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
+                    invoice.status === s.value
+                      ? "border-indigo-200 bg-indigo-50"
+                      : "border-transparent"
                   }`}
                 >
                   <StatusBadge
-                    status={status.label}
+                    status={s.label}
                     size="default"
                     showIcon={true}
                   />
                 </button>
               ))}
             </div>
-
-            <div className={createInvoiceStyles.statusDropdown}>
-              <select
-                value={invoice.status}
-                onChange={(e) => handleStatusChange(e.target.value)}
-                className="w-full"
-              >
-                <option value="draft">Draft</option>
-                <option value="unpaid">Unpaid</option>
-                <option value="paid">Paid</option>
-                <option value="overdue">Overdue</option>
-              </select>
-            </div>
           </div>
         </div>
-      </div>
-      {/* Main Content Grid - left & right columns remain unchanged except they use `invoice` state */}
-      <div className={createInvoiceStyles.mainGrid}>
-        <div className={createInvoiceStyles.leftColumn}>
-          {/* Bill From */}
+      </Card>
 
+      {/* Main grid */}
+      <div className="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_320px]">
+        <div className="space-y-5">
           {/* Bill To */}
-          <div className={createInvoiceStyles.cardContainer}>
-            <div className={createInvoiceStyles.cardHeaderContainer}>
-              <div
-                className={`${createInvoiceStyles.cardIconContainer} ${createInvoiceIconColors.billTo}`}
-              >
-                <svg
-                  className="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                >
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                  <circle cx="12" cy="7" r="4" />
-                </svg>
-              </div>
-              <h3 className={createInvoiceStyles.cardTitle}>Kepada</h3>
-            </div>
-
-            <div className={createInvoiceStyles.gridCols2}>
-              <div>
-                <label className={createInvoiceStyles.label}>Client Name</label>
-                <input
-                  value={invoice?.client?.name || ""}
-                  onChange={(e) => updateClient("name", e.target.value)}
-                  placeholder="Client Name"
-                  className={createInvoiceStyles.input}
-                />
-              </div>
-            </div>
-          </div>
+          <Card
+            icon={User}
+            title="Kepada"
+            subtitle="Client billed on this invoice"
+          >
+            <Field label="Client Name" htmlFor="clientName">
+              <input
+                id="clientName"
+                value={invoice?.client?.name || ""}
+                onChange={(e) => updateClient("name", e.target.value)}
+                placeholder="Client Name"
+                className={inputClass}
+              />
+            </Field>
+          </Card>
 
           {/* Items */}
-          <div className={createInvoiceStyles.cardContainer}>
-            <div className={createInvoiceStyles.cardHeaderWithButton}>
-              <div className={createInvoiceStyles.cardHeaderLeft}>
-                <div className={createInvoiceStyles.cardIconContainer}>
-                  <svg
-                    className="w-5 h-5"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                    <line x1="8" y1="12" x2="16" y2="12" />
-                    <line x1="12" y1="8" x2="12" y2="16" />
-                  </svg>
-                </div>
-                <h3 className={createInvoiceStyles.cardTitle}>
-                  Items & Services
-                </h3>
-              </div>
-              <div className={createInvoiceStyles.currencyBadge}>
-                All amounts in {invoice.currency}
-              </div>
-            </div>
-
-            {/* Items list */}
-            <div className={createInvoiceStyles.itemsListWrapper}>
+          <Card
+            icon={ListChecks}
+            title="Items & Services"
+            subtitle={`All amounts in ${invoice.currency}`}
+          >
+            <div className="space-y-4">
               {items.map((it, idx) => {
                 const totalValue =
                   Number(it?.qty || 0) * Number(it?.unitPrice || 0);
                 const totalLabel = currencyFmt(totalValue, invoice.currency);
+                const nilaiProfit =
+                  (Number(it?.unitPrice || 0) - Number(it?.nta || 0)) *
+                  Number(it?.qty || 0);
+                const isRugi = nilaiProfit < 0;
 
                 return (
                   <div
                     key={it?.id ?? idx}
-                    className={`${createInvoiceStyles.itemsTableRow} ${createInvoiceStyles.itemRow}`}
+                    className="rounded-lg border border-slate-200 p-4"
                   >
-                    <div className={createInvoiceStyles.itemColDescription}>
-                      {" "}
-                      {/* Menggunakan style yang sama agar konsisten */}
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        htmlFor={`name-${idx}`}
-                      >
-                        Nama Penumpang
-                      </label>
-                      <input
-                        id={`name-${idx}`}
-                        className={createInvoiceStyles.itemsInput}
-                        value={it?.name ?? ""}
-                        onChange={(e) =>
-                          updateItem(idx, "name", e.target.value)
-                        }
-                        placeholder="Nama Penumpang"
-                        title={it?.name ?? ""}
-                        aria-label={`Item ${idx + 1} name`}
-                      />
-                    </div>
-                    {/* Description */}
-                    <div className={createInvoiceStyles.itemColDescription}>
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        htmlFor={`desc-${idx}`}
-                      >
-                        Description
-                      </label>
-                      <input
-                        id={`desc-${idx}`}
-                        className={createInvoiceStyles.itemsInput}
-                        value={it?.description ?? ""}
-                        onChange={(e) =>
-                          updateItem(idx, "description", e.target.value)
-                        }
-                        placeholder="Description"
-                        title={it?.description ?? ""}
-                        aria-label={`Item ${idx + 1} description`}
-                      />
+                    <div className="mb-3">
+                      <span className="text-xs font-semibold text-slate-400">
+                        Item {idx + 1}
+                      </span>
                     </div>
 
-                    {/* Quantity */}
-                    <div className={createInvoiceStyles.itemColQuantity}>
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        htmlFor={`qty-${idx}`}
-                      >
-                        Quantity
-                      </label>
-                      <input
-                        id={`qty-${idx}`}
-                        type="text"
-                        inputMode="numeric"
-                        pattern="[0-9]*"
-                        className={createInvoiceStyles.itemsNumberInput}
-                        value={String(it?.qty ?? "")}
-                        onChange={(e) => updateItem(idx, "qty", e.target.value)}
-                        title={String(it?.qty ?? "")}
-                        aria-label={`Item ${idx + 1} quantity`}
-                      />
-                    </div>
-
-                    {/* Unit Price */}
-                    <div className={createInvoiceStyles.itemColUnitPrice}>
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        htmlFor={`price-${idx}`}
-                      >
-                        Harga
-                      </label>
-                      <input
-                        id={`price-${idx}`}
-                        type="text"
-                        inputMode="decimal"
-                        className={createInvoiceStyles.itemsNumberInput}
-                        value={String(it?.unitPrice ?? "")}
-                        onChange={(e) =>
-                          updateItem(idx, "unitPrice", e.target.value)
-                        }
-                        title={String(it?.unitPrice ?? "")}
-                        aria-label={`Item ${idx + 1} unit price`}
-                      />
-                    </div>
-                    {/* NTA */}
-
-                    {/* NTA + Supplier (sebelahan) */}
-                    <div className="col-span-3">
-                      <div className="grid grid-cols-2 gap-2">
-                        {/* NTA */}
-                        <div>
-                          <label
-                            className={createInvoiceStyles.itemsFieldLabel}
-                            htmlFor={`nta-${idx}`}
-                          >
-                            NTA
-                          </label>
+                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                      <div className="col-span-2 sm:col-span-2">
+                        <Field label="Nama Penumpang" htmlFor={`name-${idx}`}>
                           <input
-                            id={`nta-${idx}`}
-                            type="number"
-                            value={it.nta}
+                            id={`name-${idx}`}
+                            className={inputClass}
+                            value={it?.name ?? ""}
                             onChange={(e) =>
-                              updateItem(idx, "nta", e.target.value)
+                              updateItem(idx, "name", e.target.value)
                             }
-                            placeholder="Modal"
-                            className={`${createInvoiceStyles.input} border-orange-200 focus:border-orange-500`}
+                            placeholder="Nama Penumpang"
+                            aria-label={`Item ${idx + 1} name`}
                           />
-
-                          {(() => {
-                            const nilaiProfit =
-                              (it.unitPrice - (it.nta || 0)) * it.qty;
-                            const isRugi = nilaiProfit < 0;
-
-                            return (
-                              <div
-                                className={`text-[10px] mt-2 font-medium ${isRugi ? "text-red-600" : "text-green-600"}`}
-                              >
-                                {isRugi ? "Rugi: " : "Profit: "}
-                                {currencyFmt(nilaiProfit, invoice.currency)}
-                              </div>
-                            );
-                          })()}
-                        </div>
-
-                        {/* Supplier */}
-                        <div>
-                          <label
-                            className={createInvoiceStyles.itemsFieldLabel}
-                            htmlFor={`supplier-${idx}`}
-                          >
-                            Supplier
-                          </label>
-                          <input
-                            id={`supplier-${idx}`}
-                            className={createInvoiceStyles.input}
-                            value={it?.supplier ?? ""}
-                            onChange={(e) =>
-                              updateItem(idx, "supplier", e.target.value)
-                            }
-                            placeholder="Supplier"
-                          />
-                        </div>
+                        </Field>
                       </div>
+                      <div className="col-span-2 sm:col-span-2">
+                        <Field label="Description" htmlFor={`desc-${idx}`}>
+                          <input
+                            id={`desc-${idx}`}
+                            className={`${inputClass} ${
+                              itemErrors[idx]?.description
+                                ? "border-rose-500 focus-visible:ring-rose-300"
+                                : ""
+                            }`}
+                            value={it?.description ?? ""}
+                            onChange={(e) =>
+                              updateItem(idx, "description", e.target.value)
+                            }
+                            placeholder="Description"
+                            aria-label={`Item ${idx + 1} description`}
+                          />
+                        </Field>
+                      </div>
+
+                      <Field label="Quantity" htmlFor={`qty-${idx}`}>
+                        <input
+                          id={`qty-${idx}`}
+                          type="text"
+                          inputMode="numeric"
+                          pattern="[0-9]*"
+                          className={inputClass}
+                          value={String(it?.qty ?? "")}
+                          onChange={(e) =>
+                            updateItem(idx, "qty", e.target.value)
+                          }
+                          aria-label={`Item ${idx + 1} quantity`}
+                        />
+                      </Field>
+
+                      <Field label="Harga" htmlFor={`price-${idx}`}>
+                        <input
+                          id={`price-${idx}`}
+                          type="text"
+                          inputMode="decimal"
+                          className={inputClass}
+                          value={String(it?.unitPrice ?? "")}
+                          onChange={(e) =>
+                            updateItem(idx, "unitPrice", e.target.value)
+                          }
+                          aria-label={`Item ${idx + 1} unit price`}
+                        />
+                      </Field>
+
+                      <Field label="NTA" htmlFor={`nta-${idx}`}>
+                        <input
+                          id={`nta-${idx}`}
+                          type="number"
+                          value={it.nta}
+                          onChange={(e) =>
+                            updateItem(idx, "nta", e.target.value)
+                          }
+                          placeholder="Modal"
+                          className={`${inputClass} border-amber-200 focus-visible:ring-amber-300`}
+                        />
+                      </Field>
+
+                      <Field label="Supplier" htmlFor={`supplier-${idx}`}>
+                        <input
+                          id={`supplier-${idx}`}
+                          className={inputClass}
+                          value={it?.supplier ?? ""}
+                          onChange={(e) =>
+                            updateItem(idx, "supplier", e.target.value)
+                          }
+                          placeholder="Supplier"
+                        />
+                      </Field>
                     </div>
 
-                    {/* Total */}
-                    <div className={createInvoiceStyles.itemColTotal}>
-                      <label
-                        className={createInvoiceStyles.itemsFieldLabel}
-                        aria-hidden
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <span
+                        className={`text-xs font-medium ${isRugi ? "text-rose-600" : "text-emerald-600"}`}
                       >
-                        Total
-                      </label>
-                      <div
-                        className={createInvoiceStyles.itemsTotal}
-                        title={totalLabel}
-                        aria-label={`Item ${idx + 1} total`}
-                      >
+                        {isRugi ? "Rugi" : "Profit"}:{" "}
+                        {currencyFmt(nilaiProfit, invoice.currency)}
+                      </span>
+                      <span className="text-sm font-semibold text-slate-900">
                         {totalLabel}
-                      </div>
+                      </span>
                     </div>
                   </div>
                 );
               })}
             </div>
 
-            <div className="mt-6">
-              <button
-                onClick={addItem}
-                className={createInvoiceStyles.addItemButton}
-              >
-                <AddIcon
-                  className={`w-4 h-4 ${createInvoiceStyles.iconHover}`}
-                />{" "}
-                Add Item
-              </button>
-            </div>
-          </div>
+            <button
+              onClick={addItem}
+              className="mt-5 inline-flex items-center gap-2 rounded-lg border border-dashed border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50/50 hover:text-indigo-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+            >
+              <Plus className="h-4 w-4" /> Add Item
+            </button>
+          </Card>
         </div>
 
-        {/* Right Column */}
-        <div className={createInvoiceStyles.rightColumn}>
-          {/* Summary & Tax */}
-          <div className={createInvoiceStyles.cardSmallContainer}>
-            <h3 className={createInvoiceStyles.cardSubtitle}>
-              Ringkasan Pembayaran
-            </h3>
+        {/* Right column */}
+        <div className="space-y-5">
+          {/* Summary */}
+          <Card icon={Wallet} title="Ringkasan Pembayaran">
             <div className="space-y-4">
-              {/* Subtotal */}
-              <div className={createInvoiceStyles.summaryRow}>
-                <div className={createInvoiceStyles.summaryLabel}>Subtotal</div>
-                <div className={createInvoiceStyles.summaryValue}>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-500">Subtotal</span>
+                <span className="font-medium text-slate-900">
                   {currencyFmt(totals.subtotal, invoice.currency)}
-                </div>
+                </span>
               </div>
 
-              <div className="space-y-3 border-t border-b border-gray-100 py-3">
-                <div>
-                  <label className={createInvoiceStyles.label}>
-                    Uang Muka (DP)
-                  </label>
+              <div className="space-y-3 border-y border-slate-100 py-3">
+                <Field label="Uang Muka (DP)" htmlFor="downPayment">
                   <input
+                    id="downPayment"
                     type="number"
-                    // Jika 0, kotak jadi kosong (clean). Jika ada isinya, muncul angkanya.
                     value={invoice.downPayment === 0 ? "" : invoice.downPayment}
                     onChange={(e) =>
                       updateInvoiceField(
@@ -1186,63 +1050,60 @@ export default function CreateInvoice() {
                         Number(e.target.value || 0),
                       )
                     }
-                    className={createInvoiceStyles.inputCenter}
-                    placeholder="Masukkan nominal uang muka..."
+                    className={`${inputClass} text-center`}
+                    placeholder="Masukkan nominal uang muka…"
                   />
-                </div>
-
-                {/* KOLOM NTA BARU */}
-
-                {/* Info tambahan agar user tahu uang muka ini mengurangi total */}
-                <div className={createInvoiceStyles.taxRow}>
-                  <div className="text-sm text-gray-500 italic font-medium">
+                </Field>
+                <div className="flex items-center justify-between text-sm">
+                  <span className="italic text-slate-500">
                     Potongan Uang Muka
-                  </div>
-                  <div className="font-medium text-red-600">
-                    - {currencyFmt(invoice.downPayment || 0)}
-                  </div>
+                  </span>
+                  <span className="font-medium text-rose-600">
+                    - {currencyFmt(invoice.downPayment || 0, invoice.currency)}
+                  </span>
                 </div>
               </div>
 
-              <div className={createInvoiceStyles.totalRow}>
-                <div className={createInvoiceStyles.totalLabel}>
+              <div className="flex items-center justify-between rounded-lg bg-indigo-50 px-3 py-3">
+                <span className="text-sm font-semibold text-indigo-900">
                   Sisa Tagihan
-                </div>
-                <div className={createInvoiceStyles.totalValue}>
+                </span>
+                <span className="text-base font-bold text-indigo-900">
                   {currencyFmt(totals.total, invoice.currency)}
-                </div>
+                </span>
               </div>
             </div>
-          </div>
-          {/* Signature Details */}
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className={createInvoiceStyles.label}>
-                Disiapkan Oleh
-              </label>
-              <input
-                value={invoice.signatureName || ""}
-                onChange={(e) =>
-                  updateInvoiceField("signatureName", e.target.value)
-                }
-                className={`${createInvoiceStyles.inputSmall} ${createInvoiceCustomStyles.inputPlaceholder}`}
-              />
+          </Card>
+
+          {/* Signature details */}
+          <Card icon={PenTool} title="Signature Details">
+            <div className="space-y-4">
+              <Field label="Disiapkan Oleh" htmlFor="signatureName">
+                <input
+                  id="signatureName"
+                  value={invoice.signatureName || ""}
+                  onChange={(e) =>
+                    updateInvoiceField("signatureName", e.target.value)
+                  }
+                  className={inputClass}
+                />
+              </Field>
+              <Field label="Disetujui Oleh" htmlFor="signatureTitle">
+                <input
+                  id="signatureTitle"
+                  value={invoice.signatureTitle || ""}
+                  onChange={(e) =>
+                    updateInvoiceField("signatureTitle", e.target.value)
+                  }
+                  className={inputClass}
+                />
+              </Field>
             </div>
-            <div>
-              <label className={createInvoiceStyles.label}>
-                Disetujui Oleh
-              </label>
-              <input
-                value={invoice.signatureTitle || ""}
-                onChange={(e) =>
-                  updateInvoiceField("signatureTitle", e.target.value)
-                }
-                className={`${createInvoiceStyles.inputSmall} ${createInvoiceCustomStyles.inputPlaceholder}`}
-              />
-            </div>
-          </div>
+          </Card>
         </div>
       </div>
+
+      <Toast toast={toast} onClose={() => setToast(null)} />
     </div>
   );
 }

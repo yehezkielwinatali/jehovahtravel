@@ -1,26 +1,42 @@
 import React, { useMemo, useState, useEffect, useCallback } from "react";
 import StatusBadge from "../components/StatusBadge";
 import { useNavigate } from "react-router-dom";
-import { invoicesStyles } from "../assets/dummyStyles";
 import { useAuth } from "@clerk/clerk-react";
+import {
+  Search,
+  Filter,
+  Plus,
+  Eye,
+  Trash2,
+  RotateCcw,
+  RefreshCw,
+  Download,
+  X,
+  Inbox,
+  AlertTriangle,
+  FileText,
+  CheckCircle2,
+  Clock,
+  CircleDashed,
+  ArrowUp,
+  ArrowDown,
+  ChevronsUpDown,
+} from "lucide-react";
 
 const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL;
 
-/* ---------- helpers ---------- */
-/* ----------------- frontend-only: normalize image URLs ----------------- */
+/* ---------- helpers (unchanged logic) ---------- */
+
 function resolveImageUrl(url) {
   if (!url) return null;
   const s = String(url).trim();
 
-  // keep data/blobs as-is
   if (s.startsWith("data:") || s.startsWith("blob:")) return s;
 
-  // absolute http(s)
   if (/^https?:\/\//i.test(s)) {
     try {
       const parsed = new URL(s);
       if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") {
-        // rewrite localhost -> API_BASE
         const path =
           parsed.pathname + (parsed.search || "") + (parsed.hash || "");
         return `${API_BASE.replace(/\/+$/, "")}${path}`;
@@ -31,17 +47,14 @@ function resolveImageUrl(url) {
     }
   }
 
-  // relative paths like "/uploads/..." or "uploads/..." -> prefix with API_BASE
   return `${API_BASE.replace(/\/+$/, "")}/${s.replace(/^\/+/, "")}`;
 }
 
 function normalizeInvoiceFromServer(inv = {}) {
   const id = inv.invoiceNumber || inv.id || inv._id || String(inv._id || "");
-
   const amount = inv.total ?? inv.subtotal ?? 0;
   const status = inv.status ?? inv.statusLabel ?? "Draft";
 
-  // Resolve any image/url fields so frontend doesn't try to load localhost from deployed client
   const logo = resolveImageUrl(
     inv.logoDataUrl ?? inv.logoUrl ?? inv.logo ?? null,
   );
@@ -52,15 +65,7 @@ function normalizeInvoiceFromServer(inv = {}) {
     inv.signatureDataUrl ?? inv.signatureUrl ?? inv.signature ?? null,
   );
 
-  return {
-    ...inv,
-    id,
-    amount,
-    status,
-    logo,
-    stamp,
-    signature,
-  };
+  return { ...inv, id, amount, status, logo, stamp, signature };
 }
 
 function normalizeClient(raw) {
@@ -95,7 +100,6 @@ function formatCurrency(amount = 0, currency = "INR") {
   }
 }
 
-/* ---------- date formatting helper: DD/MM/YYYY (e.g. 07/12/2025) ---------- */
 function formatDate(dateInput) {
   if (!dateInput) return "—";
   const d = dateInput instanceof Date ? dateInput : new Date(String(dateInput));
@@ -106,108 +110,120 @@ function formatDate(dateInput) {
   return `${dd}/${mm}/${yyyy}`;
 }
 
-/* icons (same as you had) */
-const SearchIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M21 21l-4.35-4.35M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16z" />
-  </svg>
-);
-const SortIcon = ({ className = "w-4 h-4", direction = "asc" }) => (
-  <svg
-    className={`${className} ${direction === "desc" ? "rotate-180" : ""}`}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M7 15l5 5 5-5M7 9l5-5 5 5" />
-  </svg>
-);
-const FilterIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" />
-  </svg>
-);
-const PlusIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M12 5v14m-7-7h14" />
-  </svg>
-);
-const EyeIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-const ResetIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-    <path d="M3 3v5h5" />
-  </svg>
-);
+/* ---------- small UI pieces ---------- */
 
-/* Pagination component */
+function SortIcon({ active, direction }) {
+  if (!active) return <ChevronsUpDown className="h-3.5 w-3.5 text-slate-300" />;
+  return direction === "asc" ? (
+    <ArrowUp className="h-3.5 w-3.5 text-indigo-600" />
+  ) : (
+    <ArrowDown className="h-3.5 w-3.5 text-indigo-600" />
+  );
+}
+
+function StatCard({ label, value, icon: Icon, accent }) {
+  const accentMap = {
+    indigo: {
+      bg: "bg-indigo-50",
+      ring: "ring-indigo-100",
+      text: "text-indigo-600",
+    },
+    emerald: {
+      bg: "bg-emerald-50",
+      ring: "ring-emerald-100",
+      text: "text-emerald-600",
+    },
+    amber: {
+      bg: "bg-amber-50",
+      ring: "ring-amber-100",
+      text: "text-amber-600",
+    },
+    slate: {
+      bg: "bg-slate-100",
+      ring: "ring-slate-200",
+      text: "text-slate-500",
+    },
+  };
+  const a = accentMap[accent] || accentMap.indigo;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div
+        className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${a.bg} ring-1 ring-inset ${a.ring}`}
+      >
+        <Icon className={`h-5 w-5 ${a.text}`} strokeWidth={2} />
+      </div>
+      <div>
+        <div className="text-xl font-bold tracking-tight text-slate-900">
+          {value}
+        </div>
+        <div className="text-xs text-slate-500">{label}</div>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-slate-100">
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 shrink-0 rounded-full bg-slate-100 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-3 w-32 rounded bg-slate-100 animate-pulse" />
+            <div className="h-2.5 w-20 rounded bg-slate-100 animate-pulse" />
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-3 w-20 rounded bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-6 w-16 rounded-full bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-3 w-16 rounded bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="ml-auto h-7 w-20 rounded-lg bg-slate-100 animate-pulse" />
+      </td>
+    </tr>
+  );
+}
+
+/* ---------- Pagination ---------- */
+
 function Pagination({ page, totalPages, onChange }) {
   if (totalPages <= 1) return null;
   const pages = [];
   const start = Math.max(1, page - 2);
   const end = Math.min(totalPages, start + 4);
-
   for (let i = start; i <= end; i++) pages.push(i);
+
   return (
-    <div className={invoicesStyles.pagination}>
-      <div className={invoicesStyles.paginationText}>
-        Page {page} of {totalPages}
+    <div className="flex flex-col items-center justify-between gap-3 border-t border-slate-100 px-5 py-4 sm:flex-row">
+      <div className="text-xs text-slate-500">
+        Page <span className="font-medium text-slate-700">{page}</span> of{" "}
+        <span className="font-medium text-slate-700">{totalPages}</span>
       </div>
-      <div className={invoicesStyles.paginationControls}>
+      <div className="flex items-center gap-1">
         <button
           type="button"
           onClick={() => onChange(Math.max(1, page - 1))}
           disabled={page === 1}
-          className={invoicesStyles.paginationButton}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
         >
           Previous
         </button>
-        <div className={invoicesStyles.paginationNumbers}>
+        <div className="flex items-center gap-1">
           {pages.map((p) => (
             <button
               key={p}
               type="button"
               onClick={() => onChange(p)}
-              className={`${invoicesStyles.paginationNumber} ${
+              className={`h-7 w-7 rounded-lg text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
                 p === page
-                  ? invoicesStyles.paginationNumberActive
-                  : invoicesStyles.paginationNumberInactive
+                  ? "bg-indigo-600 text-white"
+                  : "text-slate-600 hover:bg-slate-100"
               }`}
             >
               {p}
@@ -218,7 +234,7 @@ function Pagination({ page, totalPages, onChange }) {
           type="button"
           onClick={() => onChange(Math.min(totalPages, page + 1))}
           disabled={page === totalPages}
-          className={invoicesStyles.paginationButton}
+          className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
         >
           Next
         </button>
@@ -227,16 +243,8 @@ function Pagination({ page, totalPages, onChange }) {
   );
 }
 
-/* uid helper */
-function uid() {
-  try {
-    if (typeof crypto !== "undefined" && crypto.randomUUID)
-      return crypto.randomUUID();
-  } catch {}
-  return Math.random().toString(36).slice(2, 9);
-}
-
 /* ---------- Component ---------- */
+
 export default function InvoicesPage() {
   const navigate = useNavigate();
   const { getToken, isSignedIn } = useAuth();
@@ -250,12 +258,22 @@ export default function InvoicesPage() {
     endDate: "",
   });
 
+  const obtainToken = useCallback(async () => {
+    if (typeof getToken !== "function") return null;
+    try {
+      let token = await getToken({ template: "default" }).catch(() => null);
+      if (!token)
+        token = await getToken({ forceRefresh: true }).catch(() => null);
+      return token;
+    } catch {
+      return null;
+    }
+  }, [getToken]);
+
   const handleDownload = async () => {
     const token = await obtainToken();
-
     try {
       let url = `${API_BASE}/api/invoice/export/excel`;
-
       if (exportDate.mode === "month") {
         url += `?month=${exportDate.month}&year=${exportDate.year}`;
       } else {
@@ -265,12 +283,10 @@ export default function InvoicesPage() {
       const res = await fetch(url, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
       if (!res.ok) throw new Error("Gagal download");
 
       const blob = await res.blob();
       const fileUrl = window.URL.createObjectURL(blob);
-
       const a = document.createElement("a");
       a.href = fileUrl;
       a.download = "Rekap_Invoice.xlsx";
@@ -283,12 +299,11 @@ export default function InvoicesPage() {
       alert("Gagal mendownload rekapan.");
     }
   };
-  // State yang benar
+
   const [allInvoices, setAllInvoices] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  // Filters state
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("all");
   const [from, setFrom] = useState("");
@@ -297,20 +312,6 @@ export default function InvoicesPage() {
   const [sortBy, setSortBy] = useState({ key: "issueDate", dir: "desc" });
   const [page, setPage] = useState(1);
 
-  const obtainToken = useCallback(async () => {
-    if (typeof getToken !== "function") return null;
-    try {
-      let token = await getToken({ template: "default" }).catch(() => null);
-      if (!token) {
-        token = await getToken({ forceRefresh: true }).catch(() => null);
-      }
-      return token;
-    } catch {
-      return null;
-    }
-  }, [getToken]);
-
-  // FETCH DATA
   const fetchInvoices = useCallback(async () => {
     if (!isSignedIn) return;
 
@@ -329,6 +330,7 @@ export default function InvoicesPage() {
 
       if (res.status === 401) {
         console.warn("Session expired");
+        setError("unauthorized: session expired, please sign in again.");
         return;
       }
 
@@ -345,16 +347,12 @@ export default function InvoicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [obtainToken, isSignedIn]); // Hapus dependency yang tidak perlu
+  }, [obtainToken, isSignedIn]);
 
-  // TRIGGER FETCH PERTAMA KALI
   useEffect(() => {
-    if (isSignedIn) {
-      fetchInvoices();
-    }
+    if (isSignedIn) fetchInvoices();
   }, [isSignedIn, fetchInvoices]);
 
-  // client-side filtering/sorting (same logic)
   const filtered = useMemo(() => {
     let arr = Array.isArray(allInvoices) ? allInvoices.slice() : [];
 
@@ -454,11 +452,9 @@ export default function InvoicesPage() {
     navigate(`/app/invoices/${inv.id}/preview`, { state: { invoice: found } });
   }
 
-  // delete invoice (backend)
   async function handleDeleteInvoice(inv) {
     const targetId = inv._id || inv.id;
     if (!targetId) return;
-
     if (!confirm(`Delete invoice ${inv.invoiceNumber || targetId}?`)) return;
 
     try {
@@ -474,11 +470,9 @@ export default function InvoicesPage() {
       );
 
       if (res.ok) {
-        // 🔥 KUNCI AUTO REFRESH: Gunakan setStoredInvoices
         setAllInvoices((prev) =>
           prev.filter((item) => item._id !== targetId && item.id !== targetId),
         );
-        alert("Invoice deleted.");
       } else {
         const json = await res.json().catch(() => null);
         throw new Error(json?.message || "Delete failed");
@@ -489,24 +483,49 @@ export default function InvoicesPage() {
     }
   }
 
-  // Helper: client initial
   const getClientInitial = (client) => {
     const c = normalizeClient(client);
     return c.name ? c.name.charAt(0).toUpperCase() : "C";
   };
 
+  const sortableHeader = (key, label) => (
+    <th
+      onClick={() => handleSort(key)}
+      className="cursor-pointer select-none px-5 py-3 text-left text-[11px] font-medium uppercase tracking-wide text-slate-400 transition-colors hover:text-slate-600"
+    >
+      <div className="flex items-center gap-1.5">
+        {label}
+        <SortIcon active={sortBy.key === key} direction={sortBy.dir} />
+      </div>
+    </th>
+  );
+
   return (
-    <div className={invoicesStyles.pageContainer}>
+    <div className="w-full font-[Inter] text-slate-700">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
+
+      {/* Export modal */}
       {showExportModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-9999">
-          <div className="bg-white p-6 rounded-xl shadow-2xl w-96">
-            <h3 className="text-lg font-bold mb-4">Export Rekapan</h3>
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-900/40 p-4">
+          <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h3 className="text-base font-semibold text-slate-900">
+                Export Rekapan
+              </h3>
+              <button
+                onClick={() => setShowExportModal(false)}
+                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
             <div className="mb-4">
-              <label className="block text-sm mb-2 text-gray-600">Mode</label>
-
+              <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                Mode
+              </label>
               <select
-                className="w-full border p-2 rounded"
+                className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                 value={exportDate.mode}
                 onChange={(e) =>
                   setExportDate({ ...exportDate, mode: e.target.value })
@@ -520,9 +539,11 @@ export default function InvoicesPage() {
             {exportDate.mode === "month" ? (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm mb-1">Bulan</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Bulan
+                  </label>
                   <select
-                    className="w-full border p-2 rounded"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                     value={exportDate.month}
                     onChange={(e) =>
                       setExportDate({ ...exportDate, month: e.target.value })
@@ -537,12 +558,13 @@ export default function InvoicesPage() {
                     ))}
                   </select>
                 </div>
-
-                <div className="mb-4">
-                  <label className="block text-sm mb-1">Tahun</label>
+                <div className="mb-5">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Tahun
+                  </label>
                   <input
                     type="number"
-                    className="w-full border p-2 rounded"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                     value={exportDate.year}
                     onChange={(e) =>
                       setExportDate({ ...exportDate, year: e.target.value })
@@ -553,10 +575,12 @@ export default function InvoicesPage() {
             ) : (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm mb-1">Tanggal Awal</label>
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Tanggal Awal
+                  </label>
                   <input
                     type="date"
-                    className="w-full border p-2 rounded"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                     value={exportDate.startDate}
                     onChange={(e) =>
                       setExportDate({
@@ -566,35 +590,32 @@ export default function InvoicesPage() {
                     }
                   />
                 </div>
-
-                <div className="mb-4">
-                  <label className="block text-sm mb-1">Tanggal Akhir</label>
+                <div className="mb-5">
+                  <label className="mb-1.5 block text-xs font-medium text-slate-500">
+                    Tanggal Akhir
+                  </label>
                   <input
                     type="date"
-                    className="w-full border p-2 rounded"
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                     value={exportDate.endDate}
                     onChange={(e) =>
-                      setExportDate({
-                        ...exportDate,
-                        endDate: e.target.value,
-                      })
+                      setExportDate({ ...exportDate, endDate: e.target.value })
                     }
                   />
                 </div>
               </>
             )}
 
-            <div className="flex gap-2 pt-2">
+            <div className="flex gap-2 pt-1">
               <button
                 onClick={() => setShowExportModal(false)}
-                className="flex-1 px-4 py-2 bg-gray-100 rounded-lg"
+                className="flex-1 rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
               >
                 Batal
               </button>
-
               <button
                 onClick={handleDownload}
-                className="flex-1 px-4 py-2 bg-emerald-600 text-white rounded-lg"
+                className="flex-1 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
               >
                 Download
               </button>
@@ -602,36 +623,35 @@ export default function InvoicesPage() {
           </div>
         </div>
       )}
+
       {/* Header */}
-      <div className={invoicesStyles.headerContainer}>
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div>
-          <h1 className={invoicesStyles.headerTitle}>Invoice Management</h1>
-          <p className={invoicesStyles.headerSubtitle}>
-            Search, filter, and manage your invoices with powerful AI tools
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-100">
+            Invoices
+          </span>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Invoice Management
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Search, filter, and manage your invoices
           </p>
         </div>
 
-        <div className={invoicesStyles.headerActions}>
+        <div className="flex items-center gap-2">
           <button
             onClick={() => setShowExportModal(true)}
-            className="bg-emerald-600 hover:bg-emerald-700 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-all"
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           >
-            <svg
-              className="w-4 h-4"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
-            >
-              <path d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <Download className="h-4 w-4" />
             Export Rekapan
           </button>
           <button
             type="button"
             onClick={() => navigate("/app/create-invoice")}
-            className={invoicesStyles.createButton}
+            className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3.5 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
           >
-            <PlusIcon className="w-4 h-4" />
+            <Plus className="h-4 w-4" />
             Create Invoice
           </button>
         </div>
@@ -639,125 +659,104 @@ export default function InvoicesPage() {
 
       {/* Error banner */}
       {error && (
-        <div
-          style={{
-            padding: 12,
-            background: "#fff4f4",
-            color: "#7f1d1d",
-            borderRadius: 6,
-            marginBottom: 12,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <div>{error}</div>
-            <div style={{ display: "flex", gap: 8 }}>
+        <div className="mb-5 flex items-center justify-between gap-3 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <div className="flex items-center gap-2">
+            <AlertTriangle className="h-4 w-4 shrink-0" />
+            {error.replace(/^unauthorized:\s*/i, "")}
+          </div>
+          <div className="flex shrink-0 gap-2">
+            <button
+              type="button"
+              onClick={() => fetchInvoices()}
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
+            >
+              Retry
+            </button>
+            {String(error).toLowerCase().includes("unauthorized") && (
               <button
                 type="button"
-                onClick={() => fetchInvoices()}
-                style={{
-                  padding: "6px 10px",
-                  background: "#efefef",
-                  borderRadius: 4,
-                }}
+                onClick={() => navigate("/login")}
+                className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
               >
-                Retry
+                Sign In
               </button>
-              {String(error).toLowerCase().includes("unauthorized") && (
-                <button
-                  type="button"
-                  onClick={() => navigate("/login")}
-                  style={{
-                    padding: "6px 10px",
-                    background: "#111827",
-                    color: "white",
-                    borderRadius: 4,
-                  }}
-                >
-                  Sign in
-                </button>
-              )}
-            </div>
+            )}
           </div>
         </div>
       )}
 
       {/* Stats */}
-      <div className={invoicesStyles.statsGrid}>
-        <div className={invoicesStyles.statCard}>
-          <div className={invoicesStyles.statValue}>{allInvoices.length}</div>
-          <div className={invoicesStyles.statLabel}>Total Invoices</div>
-        </div>
-        <div className={invoicesStyles.statCard}>
-          <div className={invoicesStyles.statValue}>
-            {
-              allInvoices.filter(
-                (inv) => (inv.status || "").toString().toLowerCase() === "paid",
-              ).length
-            }
-          </div>
-          <div className={invoicesStyles.statLabel}>Paid</div>
-        </div>
-        <div className={invoicesStyles.statCard}>
-          <div className={invoicesStyles.statValue}>
-            {
-              allInvoices.filter((inv) =>
-                ["unpaid", "overdue"].includes(
-                  (inv.status || "").toString().toLowerCase(),
-                ),
-              ).length
-            }
-          </div>
-          <div className={invoicesStyles.statLabel}>Unpaid</div>
-        </div>
-        <div className={invoicesStyles.statCard}>
-          <div className={invoicesStyles.statValue}>
-            {
-              allInvoices.filter(
-                (inv) =>
-                  (inv.status || "").toString().toLowerCase() === "draft",
-              ).length
-            }
-          </div>
-          <div className={invoicesStyles.statLabel}>Drafts</div>
-        </div>
+      <div className="mb-5 grid grid-cols-2 gap-4 lg:grid-cols-4">
+        <StatCard
+          label="Total Invoices"
+          value={allInvoices.length}
+          icon={FileText}
+          accent="indigo"
+        />
+        <StatCard
+          label="Paid"
+          value={
+            allInvoices.filter(
+              (inv) => (inv.status || "").toString().toLowerCase() === "paid",
+            ).length
+          }
+          icon={CheckCircle2}
+          accent="emerald"
+        />
+        <StatCard
+          label="Unpaid"
+          value={
+            allInvoices.filter((inv) =>
+              ["unpaid", "overdue"].includes(
+                (inv.status || "").toString().toLowerCase(),
+              ),
+            ).length
+          }
+          icon={Clock}
+          accent="amber"
+        />
+        <StatCard
+          label="Drafts"
+          value={
+            allInvoices.filter(
+              (inv) => (inv.status || "").toString().toLowerCase() === "draft",
+            ).length
+          }
+          icon={CircleDashed}
+          accent="slate"
+        />
       </div>
 
       {/* Filters */}
-      <div className={invoicesStyles.filtersCard}>
-        <div className={invoicesStyles.filtersHeader}>
-          <div className={invoicesStyles.filtersHeaderLeft}>
-            <div className={invoicesStyles.filtersIconContainer}>
-              <FilterIcon className="w-5 h-5" />
+      <div className="mb-5 rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 ring-1 ring-inset ring-indigo-100">
+              <Filter className="h-4 w-4 text-indigo-600" />
             </div>
-            <h2 className={invoicesStyles.filtersTitle}>Filters & Search</h2>
+            <h2 className="text-sm font-semibold text-slate-900">
+              Filters & Search
+            </h2>
           </div>
-          <div className={invoicesStyles.filtersCount}>
+          <div className="text-xs text-slate-500">
             Showing{" "}
-            <span className={invoicesStyles.filtersCountNumber}>
+            <span className="font-semibold text-slate-700">
               {filtered.length}
             </span>{" "}
             of {allInvoices.length} invoices
           </div>
         </div>
 
-        <div className={invoicesStyles.filtersGrid}>
-          <div className={invoicesStyles.searchContainer}>
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+          <div className="md:col-span-2">
             <label
               htmlFor="invoice-search"
-              className={invoicesStyles.filterLabel}
+              className="mb-1.5 block text-xs font-medium text-slate-500"
             >
               Search Invoices
             </label>
-            <div className={invoicesStyles.searchInputContainer}>
-              <div className={invoicesStyles.searchIcon}>
-                <SearchIcon className="w-5 h-5 text-gray-400" />
-              </div>
+            <div className="relative">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
               <input
                 id="invoice-search"
                 name="search"
@@ -767,8 +766,8 @@ export default function InvoicesPage() {
                   setPage(1);
                 }}
                 onKeyDown={(e) => e.key === "Enter" && setPage(1)}
-                placeholder="Search by client, invoice ID, email..."
-                className={invoicesStyles.searchInput}
+                placeholder="Search by client, invoice ID, email…"
+                className="w-full rounded-lg border border-slate-200 py-2 pl-9 pr-3 text-sm text-slate-700 placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
               />
             </div>
           </div>
@@ -776,7 +775,7 @@ export default function InvoicesPage() {
           <div>
             <label
               htmlFor="status-filter"
-              className={invoicesStyles.filterLabel}
+              className="mb-1.5 block text-xs font-medium text-slate-500"
             >
               Status
             </label>
@@ -787,7 +786,7 @@ export default function InvoicesPage() {
                 setStatus(e.target.value);
                 setPage(1);
               }}
-              className={invoicesStyles.selectInput}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
             >
               <option value="all">All Status</option>
               <option value="Paid">Paid</option>
@@ -797,9 +796,11 @@ export default function InvoicesPage() {
             </select>
           </div>
 
-          <div className={invoicesStyles.dateRangeContainer}>
-            <label className={invoicesStyles.filterLabel}>Date Range</label>
-            <div className={invoicesStyles.dateRangeFlex}>
+          <div>
+            <label className="mb-1.5 block text-xs font-medium text-slate-500">
+              Date Range
+            </label>
+            <div className="flex items-center gap-2">
               <input
                 id="from-date"
                 name="from"
@@ -809,12 +810,10 @@ export default function InvoicesPage() {
                   setFrom(e.target.value);
                   setPage(1);
                 }}
-                className={invoicesStyles.dateInput}
+                className="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                 aria-label="Start date"
               />
-              <div className={invoicesStyles.dateSeparator}>
-                <span className={invoicesStyles.dateSeparatorText}>to</span>
-              </div>
+              <span className="text-xs text-slate-400">to</span>
               <input
                 id="to-date"
                 name="to"
@@ -824,16 +823,19 @@ export default function InvoicesPage() {
                   setTo(e.target.value);
                   setPage(1);
                 }}
-                className={invoicesStyles.dateInput}
+                className="w-full rounded-lg border border-slate-200 px-2 py-2 text-xs text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                 aria-label="End date"
               />
             </div>
           </div>
         </div>
 
-        <div className={invoicesStyles.filtersFooter}>
-          <div className={invoicesStyles.perPageContainer}>
-            <label htmlFor="per-page" className={invoicesStyles.perPageLabel}>
+        <div className="mt-4 flex flex-col items-start justify-between gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:items-center">
+          <div className="flex items-center gap-2">
+            <label
+              htmlFor="per-page"
+              className="text-xs font-medium text-slate-500"
+            >
               Show
             </label>
             <select
@@ -843,7 +845,7 @@ export default function InvoicesPage() {
                 setPerPage(Number(e.target.value));
                 setPage(1);
               }}
-              className={invoicesStyles.perPageSelect}
+              className="rounded-lg border border-slate-200 px-2.5 py-1.5 text-xs text-slate-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
             >
               <option value={6}>6 per page</option>
               <option value={10}>10 per page</option>
@@ -851,7 +853,7 @@ export default function InvoicesPage() {
             </select>
           </div>
 
-          <div style={{ display: "flex", gap: 8 }}>
+          <div className="flex gap-2">
             <button
               type="button"
               onClick={() => {
@@ -861,172 +863,133 @@ export default function InvoicesPage() {
                 setTo("");
                 setPage(1);
               }}
-              className={invoicesStyles.resetButton}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
             >
-              <ResetIcon className="w-4 h-4" /> Reset Filters
+              <RotateCcw className="h-3.5 w-3.5" /> Reset Filters
             </button>
             <button
               type="button"
               onClick={() => fetchInvoices()}
-              className={invoicesStyles.resetButton}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
             >
-              Refresh
+              <RefreshCw className="h-3.5 w-3.5" /> Refresh
             </button>
           </div>
         </div>
       </div>
 
       {/* Table */}
-      <div className={invoicesStyles.tableCard}>
-        <div className={invoicesStyles.tableHeader}>
-          <div className={invoicesStyles.tableHeaderContent}>
-            <div>
-              <h3 className={invoicesStyles.tableTitle}>All Invoices</h3>
-              <p className={invoicesStyles.tableSubtitle}>
-                Sorted by{" "}
-                <span className={invoicesStyles.tableSubtitleBold}>
-                  {sortBy.key}
-                </span>{" "}
-                ·{" "}
-                <span className={invoicesStyles.tableSubtitleBold}>
-                  {sortBy.dir === "asc" ? "Ascending" : "Descending"}
-                </span>
-              </p>
-            </div>
-          </div>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        <div className="border-b border-slate-100 px-5 py-4">
+          <h3 className="text-sm font-semibold text-slate-900">All Invoices</h3>
+          <p className="mt-0.5 text-xs text-slate-500">
+            Sorted by{" "}
+            <span className="font-medium text-slate-700">{sortBy.key}</span> ·{" "}
+            <span className="font-medium text-slate-700">
+              {sortBy.dir === "asc" ? "Ascending" : "Descending"}
+            </span>
+          </p>
         </div>
 
-        <div className={invoicesStyles.tableContainer}>
-          <table className={invoicesStyles.table}>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
             <thead>
-              <tr className={invoicesStyles.tableHead}>
-                <th
-                  onClick={() => handleSort("client")}
-                  className={invoicesStyles.tableHeaderCell}
-                >
-                  <div className={invoicesStyles.tableHeaderContent}>
-                    Client{" "}
-                    <SortIcon
-                      direction={sortBy.key === "client" ? sortBy.dir : "asc"}
-                    />
-                  </div>
+              <tr className="border-b border-slate-100 bg-slate-50/60">
+                {sortableHeader("client", "Client")}
+                {sortableHeader("amount", "Amount")}
+                {sortableHeader("status", "Status")}
+                {sortableHeader("dueDate", "Due Date")}
+                <th className="px-5 py-3 text-right text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Actions
                 </th>
-                <th
-                  onClick={() => handleSort("amount")}
-                  className={invoicesStyles.tableHeaderCell}
-                >
-                  <div className={invoicesStyles.tableHeaderContent}>
-                    Amount{" "}
-                    <SortIcon
-                      direction={sortBy.key === "amount" ? sortBy.dir : "asc"}
-                    />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort("status")}
-                  className={invoicesStyles.tableHeaderCell}
-                >
-                  <div className={invoicesStyles.tableHeaderContent}>
-                    Status{" "}
-                    <SortIcon
-                      direction={sortBy.key === "status" ? sortBy.dir : "asc"}
-                    />
-                  </div>
-                </th>
-                <th
-                  onClick={() => handleSort("dueDate")}
-                  className={invoicesStyles.tableHeaderCell}
-                >
-                  <div className={invoicesStyles.tableHeaderContent}>
-                    Due Date{" "}
-                    <SortIcon
-                      direction={sortBy.key === "dueDate" ? sortBy.dir : "asc"}
-                    />
-                  </div>
-                </th>
-                <th className={invoicesStyles.tableHeaderCellRight}>Actions</th>
               </tr>
             </thead>
-            <tbody className={invoicesStyles.tableBody}>
-              {pageData.map((inv) => {
-                const client = normalizeClient(inv.client);
-                const clientInitial = getClientInitial(inv.client);
-                return (
-                  <tr key={inv.id} className={invoicesStyles.tableRow}>
-                    <td className={invoicesStyles.clientCell}>
-                      <div className={invoicesStyles.clientContainer}>
-                        <div className={invoicesStyles.clientAvatar}>
-                          {clientInitial}
+            <tbody>
+              {loading &&
+                Array.from({ length: perPage }).map((_, i) => (
+                  <SkeletonRow key={i} />
+                ))}
+
+              {!loading &&
+                pageData.map((inv) => {
+                  const client = normalizeClient(inv.client);
+                  const clientInitial = getClientInitial(inv.client);
+                  return (
+                    <tr
+                      key={inv.id}
+                      className="group border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50"
+                    >
+                      <td className="px-5 py-4">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                            {clientInitial}
+                          </div>
+                          <div>
+                            <div className="font-medium text-slate-900">
+                              {client.name || inv.company || inv.id}
+                            </div>
+                            <div className="text-xs text-slate-400">
+                              {inv.id}
+                            </div>
+                            {(client.email || inv.email) && (
+                              <div className="text-xs text-slate-400">
+                                {client.email || inv.email}
+                              </div>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <div className={invoicesStyles.clientInfo}>
-                            {client.name || inv.company || inv.id}
-                          </div>
-                          <div className={invoicesStyles.clientId}>
-                            {inv.id}
-                          </div>
-                          <div className={invoicesStyles.clientEmail}>
-                            {client.email || inv.email}
-                          </div>
+                      </td>
+                      <td className="px-5 py-4 font-medium text-slate-700">
+                        {formatCurrency(inv.amount || 0, inv.currency)}
+                      </td>
+                      <td className="px-5 py-4">
+                        <StatusBadge
+                          status={inv.status}
+                          size="default"
+                          showIcon
+                        />
+                      </td>
+                      <td className="px-5 py-4 text-slate-500">
+                        {inv.dueDate ? formatDate(inv.dueDate) : "—"}
+                      </td>
+                      <td className="px-5 py-4">
+                        <div className="flex justify-end gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => openInvoice(inv)}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+                          >
+                            <Eye className="h-3.5 w-3.5" /> View
+                          </button>
                         </div>
-                      </div>
-                    </td>
-                    <td className={invoicesStyles.amountCell}>
-                      {formatCurrency(inv.amount || 0, inv.currency)}
-                    </td>
-                    <td className={invoicesStyles.statusCell}>
-                      <StatusBadge
-                        status={inv.status}
-                        size="default"
-                        showIcon
-                      />
-                    </td>
-                    <td className={invoicesStyles.dateCell}>
-                      {inv.dueDate ? formatDate(inv.dueDate) : "—"}
-                    </td>
-                    <td className={invoicesStyles.actionsCell}>
-                      <div className={invoicesStyles.actionsContainer}>
-                        <button
-                          type="button"
-                          onClick={() => openInvoice(inv)}
-                          className={invoicesStyles.viewButton}
-                        >
-                          <EyeIcon className={invoicesStyles.buttonIcon} /> View
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-              {pageData.length === 0 && !loading && (
+                      </td>
+                    </tr>
+                  );
+                })}
+
+              {!loading && pageData.length === 0 && (
                 <tr>
-                  <td colSpan="5" className={invoicesStyles.emptyState}>
-                    <div className={invoicesStyles.emptyStateText}>
-                      <div className={invoicesStyles.emptyStateIconContainer}>
-                        <SearchIcon className={invoicesStyles.emptyStateIcon} />
+                  <td colSpan={5} className="px-6 py-16">
+                    <div className="flex flex-col items-center justify-center text-center">
+                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                        <Inbox className="h-5 w-5 text-slate-400" />
                       </div>
-                      <div className={invoicesStyles.emptyStateTitle}>
+                      <div className="mt-4 text-sm font-medium text-slate-700">
                         No invoices found
                       </div>
-                      <p className={invoicesStyles.emptyStateMessage}>
+                      <p className="mt-1 text-xs text-slate-500">
                         Try adjusting your search filters or create a new
                         invoice to get started.
                       </p>
                       <button
                         type="button"
                         onClick={() => navigate("/app/create-invoice")}
-                        className={invoicesStyles.emptyStateAction}
+                        className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                       >
-                        Create your first invoice
+                        <Plus className="h-3.5 w-3.5" /> Create your first
+                        invoice
                       </button>
                     </div>
-                  </td>
-                </tr>
-              )}
-              {loading && (
-                <tr>
-                  <td colSpan="5" style={{ padding: 40, textAlign: "center" }}>
-                    Loading invoices...
                   </td>
                 </tr>
               )}
@@ -1034,14 +997,12 @@ export default function InvoicesPage() {
           </table>
         </div>
 
-        {pageData.length > 0 && (
-          <div className={invoicesStyles.paginationContainer}>
-            <Pagination
-              page={page}
-              totalPages={totalPages}
-              onChange={(p) => setPage(p)}
-            />
-          </div>
+        {!loading && pageData.length > 0 && (
+          <Pagination
+            page={page}
+            totalPages={totalPages}
+            onChange={(p) => setPage(p)}
+          />
         )}
       </div>
     </div>

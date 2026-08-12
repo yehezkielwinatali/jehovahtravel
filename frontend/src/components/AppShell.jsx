@@ -1,10 +1,25 @@
-import { appShellStyles } from "../assets/dummyStyles";
+import { useEffect, useState } from "react";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { useClerk, useUser } from "@clerk/clerk-react";
+import {
+  ChevronsLeft,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PlusCircle,
+  X,
+} from "lucide-react";
+
 import logo from "../assets/logo.png";
-import { Link, NavLink, useNavigate, Outlet } from "react-router-dom";
-import { useState } from "react";
-import { useUser } from "@clerk/clerk-react";
-import { useClerk } from "@clerk/clerk-react";
-import { useEffect } from "react";
+
+const COLLAPSE_KEY = "appShellCollapsed";
+
+const NAV_ITEMS = [
+  { to: "/app/dashboard", icon: LayoutDashboard, label: "Dashboard" },
+  { to: "/app/invoices", icon: FileText, label: "Invoices" },
+  { to: "/app/create-invoice", icon: PlusCircle, label: "Create Invoice" },
+];
 
 const AppShell = () => {
   const navigate = useNavigate();
@@ -14,8 +29,8 @@ const AppShell = () => {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(() => {
     try {
-      return localStorage.getItem("appShellCollapsed") === "true";
-    } catch (e) {
+      return localStorage.getItem(COLLAPSE_KEY) === "true";
+    } catch {
       return false;
     }
   });
@@ -24,328 +39,249 @@ const AppShell = () => {
 
   useEffect(() => {
     const checkScreenSize = () => {
-      setIsMobile(window.innerWidth < 1024);
-      if (window.innerWidth < 1024) setCollapsed(false);
+      const mobile = window.innerWidth < 1024;
+      setIsMobile(mobile);
+
+      if (mobile) {
+        setCollapsed(false);
+      }
     };
+
     checkScreenSize();
     window.addEventListener("resize", checkScreenSize);
+
     return () => window.removeEventListener("resize", checkScreenSize);
   }, []);
 
   useEffect(() => {
     try {
-      localStorage.setItem("sidebar_collapsed", collapsed ? "true" : "false");
-    } catch {}
+      localStorage.setItem(COLLAPSE_KEY, String(collapsed));
+    } catch {
+      // Ignore storage errors, such as blocked browser storage.
+    }
   }, [collapsed]);
 
-  // Lock body scroll when mobile drawer is open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
+
     return () => {
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
 
-  // Header scroll effect
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 10);
+
+    handleScroll();
     window.addEventListener("scroll", handleScroll);
+
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  //logout
   const logout = async () => {
     try {
       await signOut();
-    } catch (e) {
-      console.warn("Logout failed:", e);
+      navigate("/login");
+    } catch (error) {
+      console.warn("Logout failed:", error);
     }
-    navigate("/login");
   };
 
-  // Toggle sidebar collapse
-  const toggleSidebar = () => setCollapsed(!collapsed);
-  //display name helper
   const displayName = (() => {
     if (!user) return "User";
+
     const name = user.fullName || user.firstName || user.username || "";
-    return name.trim() || (user.email || "").split?.("@")?.[0] || "User";
+    const email = user.primaryEmailAddress?.emailAddress || "";
+
+    return name.trim() || email.split("@")[0] || "User";
   })();
 
-  const firstName = () => {
-    const parts = displayName.split(" ").filter(Boolean);
-    return parts.length ? parts[0] : displayName;
-  };
+  const firstName = displayName.split(" ").filter(Boolean)[0] || displayName;
 
-  const initials = () => {
+  const initials = (() => {
     const parts = displayName.split(" ").filter(Boolean);
+
+    if (parts.length === 0) return "U";
     if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-    return (
-      parts[0].charAt(0) + parts[parts.length - 1].charAt(0)
-    ).toUpperCase();
-  };
 
-  //for icons
-  const DashboardIcon = ({ className = "w-5 h-5" }) => (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
-      <polyline points="9 22 9 12 15 12 15 22" />
-    </svg>
-  );
+    return `${parts[0].charAt(0)}${parts.at(-1).charAt(0)}`.toUpperCase();
+  })();
 
-  const InvoiceIcon = ({ className = "w-5 h-5" }) => (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <polyline points="14 2 14 8 20 8" />
-      <line x1="16" y1="13" x2="8" y2="13" />
-      <line x1="16" y1="17" x2="8" y2="17" />
-      <polyline points="10 9 9 9 8 9" />
-    </svg>
-  );
-
-  const CreateIcon = ({ className = "w-5 h-5" }) => (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="16" />
-      <line x1="8" y1="12" x2="16" y2="12" />
-    </svg>
-  );
-
-  const ProfileIcon = ({ className = "w-5 h-5" }) => (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-      <circle cx="12" cy="7" r="4" />
-    </svg>
-  );
-
-  const LogoutIcon = ({ className = "w-5 h-5" }) => (
-    <svg
-      className={className}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-    >
-      <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-      <polyline points="16 17 21 12 16 7" />
-      <line x1="21" y1="12" x2="9" y2="12" />
-    </svg>
-  );
-
-  const CollapseIcon = ({ className = "w-4 h-4", collapsed }) => (
-    <svg
-      className={`${className} transition-transform duration-300 ${
-        collapsed ? "rotate-180" : ""
-      }`}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-    >
-      <path
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        d="M11 19l-7-7 7-7m8 14l-7-7 7-7"
-      />
-    </svg>
-  );
-
-  /* ----- SidebarLink ----- */
-  const SidebarLink = ({ to, icon, children }) => (
+  const SidebarLink = ({ to, icon: Icon, children }) => (
     <NavLink
       to={to}
-      className={({ isActive }) => `
-        ${appShellStyles.sidebarLink}
-        ${collapsed ? appShellStyles.sidebarLinkCollapsed : ""}
-        ${
-          isActive
-            ? appShellStyles.sidebarLinkActive
-            : appShellStyles.sidebarLinkInactive
-        }
-      `}
       onClick={() => setMobileOpen(false)}
+      className={({ isActive }) =>
+        `group relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
+          collapsed ? "justify-center" : ""
+        } ${
+          isActive
+            ? "bg-indigo-50 text-indigo-700"
+            : "text-slate-500 hover:bg-slate-50 hover:text-slate-800"
+        }`
+      }
     >
       {({ isActive }) => (
         <>
-          <div
-            className={`${appShellStyles.sidebarIcon} ${
+          <Icon
+            className={`h-5 w-5 shrink-0 ${
               isActive
-                ? appShellStyles.sidebarIconActive
-                : appShellStyles.sidebarIconInactive
+                ? "text-indigo-600"
+                : "text-slate-400 group-hover:text-slate-600"
             }`}
-          >
-            {icon}
-          </div>
-          {!collapsed && (
-            <span className={appShellStyles.sidebarText}>{children}</span>
-          )}
-          {!collapsed && isActive && (
-            <div className={appShellStyles.sidebarActiveIndicator} />
+            strokeWidth={2}
+          />
+          {!collapsed && <span className="truncate">{children}</span>}
+          {collapsed && (
+            <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-slate-900 px-2 py-1 text-xs text-white opacity-0 shadow-lg transition-opacity group-hover:opacity-100">
+              {children}
+            </span>
           )}
         </>
       )}
     </NavLink>
   );
 
+  const sidebarWidth = collapsed ? "w-20" : "w-64";
+  const email = user?.primaryEmailAddress?.emailAddress;
+
   return (
-    <div className={appShellStyles.root}>
-      <div className={appShellStyles.layout}>
+    <div className="min-h-screen w-full bg-slate-50 font-sans text-slate-700">
+      {mobileOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-slate-900/40 lg:hidden"
+          onClick={() => setMobileOpen(false)}
+          aria-hidden="true"
+        />
+      )}
+
+      <div className="flex">
         <aside
-          className={`${appShellStyles.sidebar} ${
-            collapsed
-              ? appShellStyles.sidebarCollapsed
-              : appShellStyles.sidebarExpanded
+          className={`fixed inset-y-0 left-0 z-50 flex ${sidebarWidth} shrink-0 flex-col border-r border-slate-200 bg-white transition-all duration-300 ease-in-out lg:sticky lg:top-0 lg:h-screen lg:translate-x-0 ${
+            mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"
           }`}
         >
-          <div className={appShellStyles.sidebarGradient}></div>
-          <div className={appShellStyles.sidebarContainer}>
+          <div className="flex h-full flex-col p-4">
             <div
-              className={`${appShellStyles.logoContainer} ${
-                collapsed ? appShellStyles.logoContainerCollapsed : ""
+              className={`mb-6 flex items-center gap-2 px-1 ${
+                collapsed ? "justify-center" : ""
               }`}
             >
-              <Link to="/" className={appShellStyles.logoLink}>
-                <div className="relative">
-                  <img
-                    src={logo}
-                    alt="logo"
-                    className={appShellStyles.logoContainer}
-                  />
-                  <div
-                    className="absolute inset-0 rounded-lg blur-sm group-hover:blur-md transition-all
-                   duration-300"
-                  />
-                </div>
-                {!collapsed && (
-                  <div className={appShellStyles.logoTextContainer}>
-                    <div className={appShellStyles.logoUnderline}> </div>
-                  </div>
-                )}
+              <Link
+                to="/"
+                className="flex min-w-0 items-center gap-2"
+                onClick={() => setMobileOpen(false)}
+              >
+                <img
+                  src={logo}
+                  alt="Logo"
+                  className="h-10 w-full max-w-48 shrink-0 rounded-lg object-contain"
+                />
               </Link>
+              <button
+                type="button"
+                onClick={() => setMobileOpen(false)}
+                className="ml-auto rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 lg:hidden"
+                aria-label="Close menu"
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
-            {/* ----- Navigation Links ----- */}
-            <nav className={appShellStyles.nav}>
-              <SidebarLink to="/app/dashboard" icon={<DashboardIcon />}>
-                Dashboard
-              </SidebarLink>
-              <SidebarLink to="/app/invoices" icon={<InvoiceIcon />}>
-                Invoices
-              </SidebarLink>
-              <SidebarLink to="/app/create-invoice" icon={<CreateIcon />}>
-                Create Invoice
-              </SidebarLink>
+
+            <nav className="flex flex-col gap-1">
+              {NAV_ITEMS.map((item) => (
+                <SidebarLink key={item.to} to={item.to} icon={item.icon}>
+                  {item.label}
+                </SidebarLink>
+              ))}
             </nav>
-            <div className="mt-5">
-              <div className={appShellStyles.collapseSection}>
+
+            <div className="mt-auto space-y-3 pt-4">
+              {!isMobile && (
                 <button
-                  onClick={toggleSidebar}
-                  className={`${appShellStyles.collapseButtonInner} ${collapsed ? appShellStyles.collapseButtonCollapsed : ""}`}
+                  type="button"
+                  onClick={() => setCollapsed((current) => !current)}
+                  className={`flex w-full items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 text-xs font-medium text-slate-500 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 ${
+                    collapsed ? "justify-center" : "justify-between"
+                  }`}
                 >
-                  {!collapsed && (
-                    <span>{collapsed ? "Expand" : "Collapse"}</span>
-                  )}
-                  <CollapseIcon collapsed={collapsed} />
+                  {!collapsed && <span>Collapse</span>}
+                  <ChevronsLeft
+                    className={`h-4 w-4 shrink-0 transition-transform duration-300 ${
+                      collapsed ? "rotate-180" : ""
+                    }`}
+                  />
                 </button>
-              </div>
-              <div className="mt-6">
-                <div className={appShellStyles.userSection}>
-                  <div
-                    className={`${appShellStyles.userDivider} ${collapsed ? appShellStyles.userDividerCollapsed : appShellStyles.userDividerExpanded}`}
-                  >
-                    {!collapsed ? (
-                      <button
-                        onClick={logout}
-                        className={appShellStyles.logoutButton}
-                      >
-                        <LogoutIcon className={appShellStyles.logoutIcon} />
-                        <span>Logout</span>
-                      </button>
-                    ) : (
-                      <button
-                        onClick={logout}
-                        className="w-full flex items-center justify-center p-3 rounded-xl text-red-600 hover:bg-red-50 hover:shadow-md transition-all duration-300"
-                      >
-                        <LogoutIcon className="w-5 h-5 hover:scale-110 transition-transform" />
-                      </button>
-                    )}
-                  </div>
-                </div>
+              )}
+
+              <div className="border-t border-slate-100 pt-3">
+                <button
+                  type="button"
+                  onClick={logout}
+                  className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-rose-600 transition-colors hover:bg-rose-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-300 ${
+                    collapsed ? "justify-center" : ""
+                  }`}
+                >
+                  <LogOut className="h-5 w-5 shrink-0" strokeWidth={2} />
+                  {!collapsed && <span>Logout</span>}
+                </button>
               </div>
             </div>
           </div>
         </aside>
-        <div className="flex-1 min-w-0">
+
+        <div className="flex min-h-screen w-0 flex-1 flex-col">
           <header
-            className={`${appShellStyles.header} ${
-              scrolled
-                ? appShellStyles.headerScrolled
-                : appShellStyles.headerNotScrolled
+            className={`sticky top-0 z-30 flex items-center gap-3 border-b border-slate-200 bg-white/90 px-4 py-3.5 backdrop-blur transition-shadow sm:px-6 ${
+              scrolled ? "shadow-sm" : ""
             }`}
           >
-            <div className={appShellStyles.headerTopSection}>
-              <div className={appShellStyles.headerContent}>
-                <div className={appShellStyles.welcomeContainer}>
-                  <h2 className={appShellStyles.welcomeTitle}>
-                    Welcome Back, {""}
-                    <span className={appShellStyles.welcomeName}>
-                      {firstName() || initials()}
-                    </span>
-                  </h2>
-                </div>
-              </div>
-            </div>
-            <div className={appShellStyles.headerActions}>
+            <button
+              type="button"
+              onClick={() => setMobileOpen(true)}
+              className="rounded-lg p-2 text-slate-500 hover:bg-slate-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300 lg:hidden"
+              aria-label="Open menu"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            <h2 className="truncate text-sm font-medium text-slate-500 sm:text-base">
+              Welcome Back,{" "}
+              <span className="font-semibold text-slate-900">{firstName}</span>
+            </h2>
+
+            <div className="ml-auto flex items-center gap-3">
               <button
-                className={appShellStyles.ctaButton}
+                type="button"
                 onClick={() => navigate("/app/create-invoice")}
+                className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
               >
-                <CreateIcon className={appShellStyles.ctaIcon} />
-                <span className="hidden xs:inline">Create Invoice</span>
-                <span className="xs:hidden">Create</span>
+                <PlusCircle className="h-4 w-4" />
+                <span className="hidden sm:inline">Create Invoice</span>
+                <span className="sm:hidden">Create</span>
               </button>
-              <div className={appShellStyles.userSectionDesktop}>
-                <div className={appShellStyles.userInfo}>
-                  <div className={appShellStyles.userName}>{displayName}</div>
-                  <div className={appShellStyles.userEmail}>{user?.email}</div>
-                </div>
-                <div className={appShellStyles.userAvatarContainer}>
-                  <div className={appShellStyles.userAvatar}>
-                    {initials()}
-                    <div className={appShellStyles.userAvatarBorder} />
+
+              <div className="hidden items-center gap-3 border-l border-slate-200 pl-3 sm:flex">
+                <div className="text-right">
+                  <div className="text-sm font-medium text-slate-900">
+                    {displayName}
                   </div>
-                  <div className={appShellStyles.userStatus}></div>
+                  {email && (
+                    <div className="text-xs text-slate-400">{email}</div>
+                  )}
+                </div>
+                <div className="relative">
+                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                    {initials}
+                  </div>
+                  <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-emerald-500" />
                 </div>
               </div>
             </div>
           </header>
-          <main className={appShellStyles.main}>
-            <div className={appShellStyles.mainContainer}>
-              <Outlet />
-            </div>
+
+          <main className="flex-1 p-4 sm:p-6 lg:p-8">
+            <Outlet />
           </main>
         </div>
       </div>

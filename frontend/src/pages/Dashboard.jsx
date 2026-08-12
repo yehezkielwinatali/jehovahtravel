@@ -1,24 +1,32 @@
-import { dashboardStyles } from "../assets/dummyStyles";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@clerk/clerk-react";
 import React, { useEffect, useState, useCallback, useMemo } from "react";
-import KpiCard from "../components/KpiCard";
-import StatuBadge from "../components/StatusBadge";
+import {
+  FileText,
+  DollarSign,
+  Clock,
+  Eye,
+  Plus,
+  Building2,
+  ArrowRight,
+  ArrowUpRight,
+  ArrowDownRight,
+  CheckCircle2,
+  AlertTriangle,
+  CircleDashed,
+  TimerReset,
+  Inbox,
+} from "lucide-react";
+
 const API_BASE = import.meta.env.VITE_REACT_APP_BACKEND_URL;
 
-function normalizeClient(raw) {
-  if (!raw) return { name: "", email: "", address: "", phone: "" };
-  if (typeof raw === "string")
-    return { name: raw, email: "", address: "", phone: "" };
-  if (typeof raw === "object") {
-    return {
-      name: raw.name ?? raw.company ?? raw.client ?? "",
-      email: raw.email ?? raw.emailAddress ?? "",
-      address: raw.address ?? "",
-      phone: raw.phone ?? raw.contact ?? "",
-    };
-  }
-  return { name: "", email: "", address: "", phone: "" };
+/* ------------------------------------------------------------------ */
+/* Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function capitalize(s) {
+  if (!s) return s;
+  return String(s).charAt(0).toUpperCase() + String(s).slice(1);
 }
 
 function currencyFmt(amount = 0) {
@@ -26,120 +34,165 @@ function currencyFmt(amount = 0) {
     return new Intl.NumberFormat("id-ID", {
       style: "currency",
       currency: "IDR",
+      maximumFractionDigits: 0,
     }).format(Number(amount || 0));
   } catch {
-    return `IDR ${amount}`;
+    return `Rp ${amount}`;
   }
-}
-
-const TrendingUpIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M23 6l-9.5 9.5-5-5L1 18" />
-    <path d="M17 6h6v6" />
-  </svg>
-);
-const DollarIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <line x1="12" y1="1" x2="12" y2="23" />
-    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-  </svg>
-);
-const ClockIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <circle cx="12" cy="12" r="10" />
-    <polyline points="12 6 12 12 16 14" />
-  </svg>
-);
-const BrainIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M9.5 14.5A2.5 2.5 0 0 1 7 12c0-1.38.5-2 1-3 1.072-2.143 2.928-3.25 4.5-3 1.572.25 3 2 3 4 0 1.5-.5 2.5-1 3.5-1 2-2 3-3.5 3-1.5 0-2.5-1.5-2.5-3Z" />
-    <path d="M14.5 9.5A2.5 2.5 0 0 1 17 12c0 1.38-.5 2-1 3-1.072 2.143-2.928 3.25-4.5 3-1.572-.25-3-2-3-4 0-1.5.5-2.5 1-3.5 1-2 2-3 3.5-3 1.5 0 2.5 1.5 2.5 3Z" />
-  </svg>
-);
-const FileTextIcon = ({ className = "w-5 h-5" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-    <polyline points="14 2 14 8 20 8" />
-    <line x1="16" y1="13" x2="8" y2="13" />
-    <line x1="16" y1="17" x2="8" y2="17" />
-    <polyline points="10 9 9 9 8 9" />
-  </svg>
-);
-const EyeIcon = ({ className = "w-4 h-4" }) => (
-  <svg
-    className={className}
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-  >
-    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-    <circle cx="12" cy="12" r="3" />
-  </svg>
-);
-
-/* small helpers */
-function capitalize(s) {
-  if (!s) return s;
-  return String(s).charAt(0).toUpperCase() + String(s).slice(1);
-}
-
-async function fetchWithToken(url, options = {}) {
-  const { getToken } = useAuth();
-  let token = null;
-  if (typeof getToken === "function") {
-    token = await getToken({ template: "default" }).catch(() => null);
-    if (!token)
-      token = await getToken({ forceRefresh: true }).catch(() => null);
-  }
-
-  const headers = {
-    ...(options.headers || {}),
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
-  };
-  const res = await fetch(url, { ...options, headers });
-  return res;
 }
 
 function formatDate(dateInput) {
   if (!dateInput) return "—";
   const d = dateInput instanceof Date ? dateInput : new Date(String(dateInput));
   if (Number.isNaN(d.getTime())) return "—";
-  const dd = String(d.getDate()).padStart(2, "0");
-  const mm = String(d.getMonth() + 1).padStart(2, "0");
-  const yyyy = d.getFullYear();
-  return `${dd}/${mm}/${yyyy}`;
+  return d.toLocaleDateString("id-ID", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 }
+
+function getClientName(inv) {
+  if (!inv) return "";
+  if (typeof inv.client === "string") return inv.client;
+  if (typeof inv.client === "object")
+    return inv.client?.name || inv.client?.company || inv.company || "";
+  return inv.company || "Client";
+}
+
+const STATUS_STYLES = {
+  Paid: {
+    text: "text-emerald-700",
+    bg: "bg-emerald-50",
+    ring: "ring-emerald-200",
+    icon: CheckCircle2,
+  },
+  Unpaid: {
+    text: "text-amber-700",
+    bg: "bg-amber-50",
+    ring: "ring-amber-200",
+    icon: TimerReset,
+  },
+  Overdue: {
+    text: "text-rose-700",
+    bg: "bg-rose-50",
+    ring: "ring-rose-200",
+    icon: AlertTriangle,
+  },
+  Draft: {
+    text: "text-slate-600",
+    bg: "bg-slate-100",
+    ring: "ring-slate-200",
+    icon: CircleDashed,
+  },
+};
+
+function StatusBadge({ status }) {
+  const cfg = STATUS_STYLES[status] || STATUS_STYLES.Draft;
+  const Icon = cfg.icon;
+  return (
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ring-1 ring-inset ${cfg.text} ${cfg.bg} ${cfg.ring}`}
+    >
+      <Icon className="h-3.5 w-3.5" strokeWidth={2.25} />
+      {status}
+    </span>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* KPI card                                                            */
+/* ------------------------------------------------------------------ */
+
+function KpiCard({ label, value, hint, trend, icon: Icon, accent }) {
+  const positive = trend >= 0;
+  const accentMap = {
+    indigo: {
+      iconBg: "bg-indigo-50",
+      iconRing: "ring-indigo-100",
+      iconText: "text-indigo-600",
+    },
+    emerald: {
+      iconBg: "bg-emerald-50",
+      iconRing: "ring-emerald-100",
+      iconText: "text-emerald-600",
+    },
+    amber: {
+      iconBg: "bg-amber-50",
+      iconRing: "ring-amber-100",
+      iconText: "text-amber-600",
+    },
+  };
+  const a = accentMap[accent] || accentMap.indigo;
+
+  return (
+    <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+      <div className="flex items-start justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+            {label}
+          </p>
+          <p className="mt-2 text-2xl font-bold tracking-tight text-slate-900">
+            {value}
+          </p>
+        </div>
+        <div
+          className={`flex h-10 w-10 items-center justify-center rounded-lg ${a.iconBg} ring-1 ring-inset ${a.iconRing}`}
+        >
+          <Icon className={`h-5 w-5 ${a.iconText}`} strokeWidth={2} />
+        </div>
+      </div>
+
+      <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3">
+        <span className="text-xs text-slate-500">{hint}</span>
+        <span
+          className={`inline-flex items-center gap-0.5 text-xs font-semibold ${
+            positive ? "text-emerald-600" : "text-rose-600"
+          }`}
+        >
+          {positive ? (
+            <ArrowUpRight className="h-3.5 w-3.5" />
+          ) : (
+            <ArrowDownRight className="h-3.5 w-3.5" />
+          )}
+          {Math.abs(trend)}%
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SkeletonRow() {
+  return (
+    <tr className="border-b border-slate-100">
+      <td className="px-5 py-4">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 shrink-0 rounded-full bg-slate-100 animate-pulse" />
+          <div className="space-y-2">
+            <div className="h-3 w-28 rounded bg-slate-100 animate-pulse" />
+            <div className="h-2.5 w-16 rounded bg-slate-100 animate-pulse" />
+          </div>
+        </div>
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-3 w-20 rounded bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-6 w-16 rounded-full bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="h-3 w-16 rounded bg-slate-100 animate-pulse" />
+      </td>
+      <td className="px-5 py-4">
+        <div className="ml-auto h-7 w-14 rounded-lg bg-slate-100 animate-pulse" />
+      </td>
+    </tr>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/* Main component                                                      */
+/* ------------------------------------------------------------------ */
 
 const Dashboard = () => {
   const navigate = useNavigate();
@@ -149,9 +202,8 @@ const Dashboard = () => {
     if (typeof getToken !== "function") return null;
     try {
       let token = await getToken({ template: "default" }).catch(() => null);
-      if (!token) {
+      if (!token)
         token = await getToken({ forceRefresh: true }).catch(() => null);
-      }
       return token || null;
     } catch {
       return null;
@@ -161,10 +213,17 @@ const Dashboard = () => {
   const [storedInvoices, setStoredInvoices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [toast, setToast] = useState(null);
 
-  const [businessProfile, setBusinessProfile] = useState(null);
+  const fire = (msg) => setToast(msg);
 
-  //fetch invoices from backend
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 2000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  // fetch invoices from backend
   const fetchInvoices = useCallback(async () => {
     if (!isSignedIn) return;
 
@@ -183,6 +242,7 @@ const Dashboard = () => {
 
       if (res.status === 401) {
         console.warn("Session expired or unauthorized");
+        setError("Sesi berakhir, silakan masuk kembali.");
         return;
       }
 
@@ -191,14 +251,12 @@ const Dashboard = () => {
       const json = await res.json();
       const raw = json?.data || [];
 
-      // 🔥 PROSES MAPPING (Penting agar data muncul di tabel)
       const mapped = raw.map((inv) => {
         const amountVal = Number(inv.total ?? inv.amount ?? 0);
         return {
           ...inv,
           id: inv.invoiceNumber || inv._id || String(inv._id || ""),
           amount: amountVal,
-          // Normalisasi status agar Badge warna-warni muncul
           status:
             typeof inv.status === "string" ? capitalize(inv.status) : "Draft",
         };
@@ -208,22 +266,18 @@ const Dashboard = () => {
       setError(null);
     } catch (err) {
       console.error("Fetch error:", err);
-      if (storedInvoices.length === 0) {
-        setError("Gagal memuat data invoice.");
-      }
+      setError("Gagal memuat data invoice.");
     } finally {
       setLoading(false);
     }
-  }, [obtainToken, isSignedIn, storedInvoices.length]);
+  }, [obtainToken, isSignedIn]);
 
   useEffect(() => {
     fetchInvoices();
 
-    // Refresh saat kembali ke tab ini
     const onFocus = () => fetchInvoices();
     window.addEventListener("focus", onFocus);
 
-    // Refresh saat ada perubahan di tab lain
     function onStorage(e) {
       if (e.key === "invoices_v1") fetchInvoices();
     }
@@ -233,45 +287,37 @@ const Dashboard = () => {
       window.removeEventListener("storage", onStorage);
       window.removeEventListener("focus", onFocus);
     };
-  }, [fetchInvoices, isSignedIn]);
+  }, [fetchInvoices]);
 
   const kpis = useMemo(() => {
-    const totalInvoices = storedInvoices.length;
-    let totalPaid = 0;
-    let totalUnpaid = 0;
-    let paidCount = 0;
-    let unpaidCount = 0;
+    let totalPaid = 0,
+      totalUnpaid = 0,
+      paidCount = 0;
 
     storedInvoices.forEach((inv) => {
       const rawAmount =
         typeof inv.amount === "number"
           ? inv.amount
           : Number(inv.total ?? inv.amount ?? 0);
-
       if (inv.status === "Paid") {
         totalPaid += rawAmount;
         paidCount++;
       }
-
-      if (inv.status === "Unpaid" || inv.status === "Overdue") {
+      if (inv.status === "Unpaid" || inv.status === "Overdue")
         totalUnpaid += rawAmount;
-        unpaidCount++;
-      }
     });
+
     const totalAmount = totalPaid + totalUnpaid;
-    const paidPercentage =
-      totalAmount > 0 ? (totalPaid / totalAmount) * 100 : 0;
-    const unpaidPercentage =
-      totalAmount > 0 ? (totalUnpaid / totalAmount) * 100 : 0;
 
     return {
-      totalInvoices,
+      totalInvoices: storedInvoices.length,
       totalPaid,
       totalUnpaid,
-      paidCount,
-      unpaidCount,
-      paidPercentage,
-      unpaidPercentage,
+      paidRate:
+        storedInvoices.length > 0
+          ? (paidCount / storedInvoices.length) * 100
+          : 0,
+      avg: storedInvoices.length > 0 ? totalAmount / storedInvoices.length : 0,
     };
   }, [storedInvoices]);
 
@@ -286,303 +332,232 @@ const Dashboard = () => {
       .slice(0, 5);
   }, [storedInvoices]);
 
-  const getClientName = (inv) => {
-    if (!inv) return "";
-    if (typeof inv.client === "string") return inv.client;
-    if (typeof inv.client === "object")
-      return inv.client?.name || inv.client?.company || inv.company || "";
-    return inv.company || "Client";
-  };
-
-  const getClientInitial = (inv) => {
-    const clientName = getClientName(inv);
-    return clientName ? clientName.charAt(0).toUpperCase() : "C";
-  };
-
   function openInvoice(invRow) {
-    const payload = invRow;
-    navigate(`/app/invoices/${invRow.id}`, { state: { invoice: payload } });
+    navigate(`/app/invoices/${invRow.id}`, { state: { invoice: invRow } });
   }
 
   return (
-    <div className={dashboardStyles.pageContainer}>
-      <div className={dashboardStyles.headerContainer}>
-        <h1 className={dashboardStyles.headerTitle}>Dashboard Overview</h1>
-        <p className={dashboardStyles.headerSubtitle}>
-          Ringkasan aktivitas invoice Anda
-        </p>
+    <div className="w-full font-[Inter] text-slate-700">
+      <style>{`@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');`}</style>
+
+      {/* header */}
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wide text-indigo-600 ring-1 ring-inset ring-indigo-100">
+            Overview
+          </span>
+          <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-900 sm:text-3xl">
+            Dashboard
+          </h1>
+          <p className="mt-1 text-sm text-slate-500">
+            Ringkasan aktivitas invoice Anda
+          </p>
+        </div>
       </div>
-      {/* Loading */}
-      {loading ? (
-        <div className="p-6">Loading Invoices...</div>
-      ) : error ? (
-        <div className="p-6">
-          <div className="text-red-600 mb-3">Error: {error}</div>
+
+      {/* error banner */}
+      {error && (
+        <div className="mb-5 flex items-center justify-between rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          <span>{error}</span>
           <div className="flex gap-2">
             <button
               onClick={fetchInvoices}
-              className="px-3 py-1 bg-blue-600 text-white rounded"
+              className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-semibold text-white hover:bg-rose-700"
             >
               Retry
             </button>
-            {String(error).toLowerCase().includes("unauthorized") && (
+            {error.toLowerCase().includes("sesi") && (
               <button
                 onClick={() => navigate("/login")}
-                className="px-3 py-1 bg-gray-700 text-white rounded"
+                className="rounded-lg border border-rose-300 px-3 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100"
               >
                 Sign In
               </button>
             )}
           </div>
         </div>
-      ) : null}
-      <div className={dashboardStyles.kpiGrid}>
+      )}
+
+      {/* KPI grid */}
+      <div className="mb-5 grid grid-cols-1 gap-4 md:grid-cols-2">
         <KpiCard
-          title="Total Invoices"
-          value={kpis.totalInvoices}
-          hint="Active Invoices"
-          iconType="document"
+          label="Total Invoices"
+          value={loading ? "—" : kpis.totalInvoices}
+          hint="Active invoices"
           trend={8.5}
+          icon={FileText}
+          accent="indigo"
         />
         <KpiCard
-          title="Total Sudah Dibayar"
-          value={currencyFmt(kpis.totalPaid)}
-          hint="Received Amount"
-          iconType="revenue"
-          trend={12.2}
-        />
-        <KpiCard
-          title="Total Belum Dibayar"
-          value={currencyFmt(kpis.totalUnpaid)}
-          hint="Outstanding Balance"
-          iconType="clock"
+          label="Belum Dibayar"
+          value={loading ? "—" : currencyFmt(kpis.totalUnpaid)}
+          hint="Outstanding balance"
           trend={-3.1}
+          icon={Clock}
+          accent="amber"
         />
       </div>
-      <div className={dashboardStyles.mainGrid}>
-        <div className={dashboardStyles.sidebarColumn}>
-          <div className={dashboardStyles.quickStatsCard}>
-            <h3 className={dashboardStyles.quickStatsTitle}>Statistik</h3>
-            <div className="space-y-3">
-              <div className={dashboardStyles.quickStatsRow}>
-                <span className={dashboardStyles.quickStatsLabel}>
-                  Paid Rate
-                </span>
-                <span className={dashboardStyles.quickStatsValue}>
-                  {kpis.totalInvoices > 0
-                    ? ((kpis.paidCount / kpis.totalInvoices) * 100).toFixed(1)
-                    : "0"}
-                  %
-                </span>
-              </div>
-              <div className={dashboardStyles.quickStatsRow}>
-                <span className={dashboardStyles.quickStatsLabel}>
-                  Avg. Invoice
-                </span>
-                <span className={dashboardStyles.quickStatsValue}>
-                  {currencyFmt(
-                    kpis.totalInvoices > 0
-                      ? (kpis.totalPaid + kpis.totalUnpaid) / kpis.totalInvoices
-                      : 0,
-                  )}
-                </span>
-              </div>
-            </div>
-          </div>
-          <div className={dashboardStyles.cardContainer}>
-            <div className="p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">
-                Quick Actions
-              </h3>
-              <div className={dashboardStyles.quickActionsContainer}>
-                <button
-                  onClick={() => navigate("/app/create-invoice")}
-                  className={`${dashboardStyles.quickActionButton} ${dashboardStyles.quickActionBlue}`}
-                >
-                  <div
-                    className={`${dashboardStyles.quickActionIconContainer} ${dashboardStyles.quickActionIconBlue}`}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M12 5v14m-7-7h14" />
-                    </svg>
-                  </div>
-                  <span className={dashboardStyles.quickActionText}>
-                    Create Invoice
-                  </span>
-                </button>
 
-                <button
-                  onClick={() => navigate("/app/invoices")}
-                  className={`${dashboardStyles.quickActionButton} ${dashboardStyles.quickActionGray}`}
-                >
-                  <div
-                    className={`${dashboardStyles.quickActionIconContainer} ${dashboardStyles.quickActionIconGray}`}
-                  >
-                    <FileTextIcon className="w-4 h-4" />
-                  </div>
-                  <span className={dashboardStyles.quickActionText}>
-                    View All Invoices
-                  </span>
-                </button>
+      {/* main grid */}
+      <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[280px_minmax(0,1fr)]">
+        {/* sidebar */}
+        <div className="space-y-5">
+          <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h3 className="text-sm font-semibold text-slate-900">
+              Quick Actions
+            </h3>
+            <div className="mt-4 space-y-2">
+              <button
+                onClick={() => navigate("/app/create-invoice")}
+                className="group flex w-full items-center gap-3 rounded-lg border border-indigo-100 bg-indigo-50 px-3.5 py-2.5 text-left text-sm font-medium text-indigo-700 transition-colors hover:bg-indigo-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-indigo-100">
+                  <Plus className="h-4 w-4 text-indigo-600" />
+                </span>
+                Create Invoice
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-indigo-400 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
 
-                <button
-                  onClick={() => navigate("/app/business")}
-                  className={`${dashboardStyles.quickActionButton} ${dashboardStyles.quickActionGray}`}
-                >
-                  <div
-                    className={`${dashboardStyles.quickActionIconContainer} ${dashboardStyles.quickActionIconGray}`}
-                  >
-                    <svg
-                      className="w-4 h-4"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                    >
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
-                      <circle cx="12" cy="7" r="4" />
-                    </svg>
-                  </div>
-                  <span className={dashboardStyles.quickActionText}>
-                    Business Profile
-                  </span>
-                </button>
-              </div>
+              <button
+                onClick={() => navigate("/app/invoices")}
+                className="group flex w-full items-center gap-3 rounded-lg border border-slate-200 bg-white px-3.5 py-2.5 text-left text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+              >
+                <span className="flex h-7 w-7 items-center justify-center rounded-md bg-slate-100">
+                  <FileText className="h-4 w-4 text-slate-500" />
+                </span>
+                View All Invoices
+                <ArrowRight className="ml-auto h-3.5 w-3.5 text-slate-400 opacity-0 transition-opacity group-hover:opacity-100" />
+              </button>
             </div>
           </div>
         </div>
-        <div className={dashboardStyles.contentColumn}>
-          <div className={dashboardStyles.cardContainerOverflow}>
-            <div className={dashboardStyles.tableHeader}>
-              <div className={dashboardStyles.tableHeaderContent}>
-                <div>
-                  <h3 className={dashboardStyles.tableTitle}>
-                    Recent Invoices
-                  </h3>
-                  <p className={dashboardStyles.tableSubtitle}>
-                    5 Invoice terbaru berdasarkan tanggal penerbitan
-                  </p>
-                </div>
-                <button
-                  onClick={() => navigate("/app/invoices")}
-                  className={dashboardStyles.tableActionButton}
-                >
-                  View All
-                  <svg
-                    className="w-4 h-4"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                  >
-                    <path d="M5 12h14m-7-7l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
+
+        {/* content: recent invoices */}
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex items-center justify-between border-b border-slate-100 px-5 py-4">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-900">
+                Recent Invoices
+              </h3>
+              <p className="mt-0.5 text-xs text-slate-500">
+                5 invoice terbaru berdasarkan tanggal penerbitan
+              </p>
             </div>
-            <div className={dashboardStyles.tableContainer}>
-              <table className={dashboardStyles.table}>
-                <thead>
-                  <tr className={dashboardStyles.tableHead}>
-                    <th className={dashboardStyles.tableHeaderCell}>
-                      Client & ID
-                    </th>
-                    <th className={dashboardStyles.tableHeaderCell}>Amount</th>
-                    <th className={dashboardStyles.tableHeaderCell}>Status </th>
-                    <th className={dashboardStyles.tableHeaderCell}>
-                      Due Date
-                    </th>
-                    <th className={dashboardStyles.tableHeaderCell}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className={dashboardStyles.tableBody}>
-                  {recent.map((inv) => {
+            <button
+              onClick={() => navigate("/app/invoices")}
+              className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-medium text-indigo-600 transition-colors hover:text-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
+            >
+              View All <ArrowRight className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-slate-100 bg-slate-50/60 text-left text-[11px] uppercase tracking-wide text-slate-400">
+                  <th className="px-5 py-3 font-medium">Client &amp; ID</th>
+                  <th className="px-5 py-3 font-medium">Amount</th>
+                  <th className="px-5 py-3 font-medium">Status</th>
+                  <th className="px-5 py-3 font-medium">Due Date</th>
+                  <th className="px-5 py-3 text-right font-medium">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {loading &&
+                  Array.from({ length: 5 }).map((_, i) => (
+                    <SkeletonRow key={i} />
+                  ))}
+
+                {!loading &&
+                  recent.map((inv) => {
                     const clientName = getClientName(inv);
-                    const clientInitial = getClientInitial(inv);
                     return (
                       <tr
                         key={inv.id}
-                        className={dashboardStyles.tableRow}
                         onClick={() => openInvoice(inv)}
+                        className="group cursor-pointer border-b border-slate-100 transition-colors last:border-b-0 hover:bg-slate-50"
                       >
-                        <td className={dashboardStyles.tableCell}>
-                          <div className={dashboardStyles.clientAvatar}>
-                            {clientInitial}
-                          </div>
-                          <div>
-                            <div className={dashboardStyles.clientInfo}>
-                              {clientName}
+                        <td className="px-5 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-100">
+                              {clientName
+                                ? clientName.charAt(0).toUpperCase()
+                                : "C"}
                             </div>
-                            <div className={dashboardStyles.clientSubInfo}>
-                              {inv.id}
+                            <div>
+                              <div className="font-medium text-slate-900">
+                                {clientName}
+                              </div>
+                              <div className="text-xs text-slate-400">
+                                {inv.id}
+                              </div>
                             </div>
                           </div>
                         </td>
-                        <td className={dashboardStyles.tableCell}>
-                          <div className={dashboardStyles.amountCell}>
-                            {currencyFmt(inv.amount, inv.currency)}
-                          </div>
+                        <td className="px-5 py-4 font-medium text-slate-700">
+                          {currencyFmt(inv.amount)}
                         </td>
-                        <td className={dashboardStyles.tableCell}>
-                          <StatuBadge
-                            status={inv.status}
-                            size="default"
-                            showIcon={true}
-                          />
+                        <td className="px-5 py-4">
+                          <StatusBadge status={inv.status} />
                         </td>
-                        <td className={dashboardStyles.tableCell}>
-                          <div className={dashboardStyles.dateCell}>
-                            {inv.dueDate ? formatDate(inv.dueDate) : "—"}
-                          </div>
+                        <td className="px-5 py-4 text-slate-500">
+                          {inv.dueDate ? formatDate(inv.dueDate) : "—"}
                         </td>
-                        <td className={dashboardStyles.tableCell}>
-                          <div className="text-right">
+                        <td className="px-5 py-4">
+                          <div className="flex justify-end">
                             <button
                               onClick={(e) => {
                                 e.stopPropagation();
                                 openInvoice(inv);
                               }}
-                              className={dashboardStyles.actionButton}
+                              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-600 opacity-0 transition-all group-hover:opacity-100 hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700 focus-visible:opacity-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                             >
-                              <EyeIcon className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
-                              View
+                              <Eye className="h-3.5 w-3.5" /> View
                             </button>
                           </div>
                         </td>
                       </tr>
                     );
                   })}
-                  {recent.length === 0 && !loading && (
-                    <tr>
-                      <td colSpan="5" className={dashboardStyles.emptyState}>
-                        <div className={dashboardStyles.emptyStateText}>
-                          <FileTextIcon
-                            className={dashboardStyles.emptyStateIcon}
-                          />
 
-                          <div className={dashboardStyles.emptyStateMessage}>
-                            Belum ada Invoice
-                          </div>
+                {!loading && recent.length === 0 && !error && (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-16">
+                      <div className="flex flex-col items-center justify-center text-center">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-slate-100">
+                          <Inbox className="h-5 w-5 text-slate-400" />
                         </div>
+                        <p className="mt-4 text-sm font-medium text-slate-700">
+                          Belum ada invoice
+                        </p>
+                        <p className="mt-1 text-xs text-slate-500">
+                          Buat invoice pertama Anda untuk mulai melacak
+                          pembayaran.
+                        </p>
                         <button
                           onClick={() => navigate("/app/create-invoice")}
-                          className={dashboardStyles.emptyStateAction}
+                          className="mt-5 inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-indigo-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-300"
                         >
-                          Buat Invoice Disini
+                          <Plus className="h-3.5 w-3.5" /> Buat Invoice Disini
                         </button>
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                      </div>
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
+        </div>
+      </div>
+
+      {/* toast */}
+      <div
+        className={`pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center transition-all duration-300 ${
+          toast ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
+        }`}
+      >
+        <div className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-medium text-slate-700 shadow-lg">
+          {toast}
         </div>
       </div>
     </div>
